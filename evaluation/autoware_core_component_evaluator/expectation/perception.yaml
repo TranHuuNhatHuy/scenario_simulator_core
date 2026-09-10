@@ -1,0 +1,86 @@
+component: perception
+title: Perception
+description: >
+  In P0 and P2 the simulator injects detected objects and core's contribution is
+  autoware_perception_objects_converter, turning DetectedObjects into the PredictedObjects that
+  both velocity planners consume. That conversion is small but load-bearing: a stall or a
+  malformed object there stops the planner reacting to anything.
+
+  In P3 core's own ground_filter and euclidean clustering run on the simulated point cloud and the
+  recall metric becomes a real perception score.
+
+  Traffic light recognition is permanently out of scope: core has no traffic light arbiter, and
+  its behavior_velocity_planner launches only StopLineModulePlugin.
+
+interfaces:
+  - name: /perception/object_recognition/objects
+    direction: output
+    required_in: [P0, P2, P3]
+    rate: {min_hz: 5.0, max_hz: 60.0}
+    max_gap_s: 0.6
+    latency_max_ms: 400
+    checks: [finite, objects_plausible]
+    note: >
+      Driven by the simulator's detection sensor rate in P0/P2 (10 Hz by default) through the
+      converter. The 5 Hz floor is deliberately loose: this is a conversion, and tightening it
+      would measure the simulator rather than core.
+
+  - name: /perception/object_recognition/detection/objects
+    type: autoware_perception_msgs/msg/DetectedObjects
+    from_manifest: false
+    direction: input
+    required_in: [P0, P2, P3]
+    rate: {min_hz: 5.0}
+    max_gap_s: 0.6
+    checks: [finite, objects_plausible]
+    note: >
+      The converter's input -- injected by the simulator in P0/P2, produced by core's clustering
+      in P3. Not in core's interface manifest despite being the boundary between two components,
+      which is exactly the kind of gap this evaluation is meant to surface.
+
+metrics:
+  - name: perception_objects_rate_hz
+    unit: Hz
+    interface: /perception/object_recognition/objects
+    statistic: rate_hz
+    gate: {min: 5.0}
+    required_in: [P0, P2, P3]
+
+  - name: perception_objects_max_gap_s
+    unit: s
+    interface: /perception/object_recognition/objects
+    statistic: max_gap_s
+    gate: {max: 0.6}
+    required_in: [P0, P2, P3]
+
+  - name: perception_objects_latency_max_ms
+    unit: ms
+    interface: /perception/object_recognition/objects
+    statistic: latency_max_ms
+    gate: {max: 400.0}
+    required_in: [P0, P2, P3]
+    note: header.stamp to receipt. The number a planner's reaction time is bounded by.
+
+  - name: perception_check_failures
+    unit: count
+    interface: /perception/object_recognition/objects
+    statistic: check_failures
+    gate: {max: 0.0}
+    required_in: [P0, P2, P3]
+
+  - name: perception_object_recall
+    unit: ratio
+    derived: perception_object_recall
+    gate: {min: 0.9}
+    required_in: [P3]
+    note: >
+      Detected object count over the simulator's true entity count, averaged over the run and
+      capped at 1. A coarse score -- it does not match objects individually -- but it is a real
+      recall figure that only ground truth makes possible, and it collapses to 0 the moment
+      perception stops seeing the scene.
+
+  - name: perception_mean_object_count
+    unit: count
+    derived: perception_mean_object_count
+    required_in: [P0, P2, P3]
+    note: Logged, not gated. Scenario-dependent, and useful when reading a failure elsewhere.
