@@ -1,0 +1,70 @@
+component: api
+title: AD API
+description: >
+  autoware_default_adapi, plus the operation-mode endpoints that autoware_core does not implement
+  and this repo's compatibility node supplies.
+
+  These three topics are the lifecycle. concealer::FieldOperatorApplication reduces exactly them
+  into INITIALIZING -> WAITING_FOR_ROUTE -> PLANNING -> WAITING_FOR_ENGAGE -> DRIVING ->
+  ARRIVED_GOAL, so a scenario that hangs with no other symptom is almost always one of them
+  missing or stale. Contracting them explicitly converts that hang into a named failure.
+
+  All three are TRANSIENT_LOCAL, which is not incidental: concealer subscribes with
+  rclcpp::QoS(1).transient_local(), and without latching a late-joining subscriber never receives
+  a value at all.
+
+interfaces:
+  - name: /api/localization/initialization_state
+    type: autoware_adapi_v1_msgs/msg/LocalizationInitializationState
+    from_manifest: false
+    direction: output
+    required_in: [P0, P2, P3]
+    rate: {min_hz: 0.0}
+
+  - name: /api/routing/state
+    type: autoware_adapi_v1_msgs/msg/RouteState
+    from_manifest: false
+    direction: output
+    required_in: [P0, P2, P3]
+    rate: {min_hz: 0.0}
+
+  - name: /api/operation_mode/state
+    type: autoware_adapi_v1_msgs/msg/OperationModeState
+    from_manifest: false
+    direction: output
+    required_in: [P0, P2, P3]
+    rate: {min_hz: 0.0}
+    note: >
+      The gap that blocks everything. autoware_default_adapi implements interface, localization
+      and routing only; there is no operation_mode node in autoware_core, so this topic has no
+      publisher until the compatibility node supplies one. Retiring that node means landing an
+      OperationModeNode upstream, at which point this entry stops being a shim contract and
+      becomes a core one.
+
+metrics:
+  - name: api_localization_state_available
+    unit: bool
+    interface: /api/localization/initialization_state
+    statistic: observed
+    gate: {min: 1.0}
+    required_in: [P0, P2, P3]
+
+  - name: api_routing_state_available
+    unit: bool
+    interface: /api/routing/state
+    statistic: observed
+    gate: {min: 1.0}
+    required_in: [P0, P2, P3]
+
+  - name: api_operation_mode_state_available
+    unit: bool
+    interface: /api/operation_mode/state
+    statistic: observed
+    gate: {min: 1.0}
+    required_in: [P0, P2, P3]
+
+  - name: api_time_to_route_set_s
+    unit: s
+    derived: time_to_route_set_s
+    gate: {max: 120.0}
+    required_in: [P0, P2, P3]
