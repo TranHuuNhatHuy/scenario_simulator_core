@@ -1,0 +1,260 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  The autoware_core profile launcher. concealer::ros2_launch() forks this, once per Ego entity.
+
+  It is the default for architecture_type:=awf/core/1.0.0, so the usual invocation is just:
+
+    ros2 launch scenario_test_runner scenario_test_runner.launch.py scenario:=<path>
+
+  IMPORTANT: every <arg> that EgoEntity pushes for awf/core (traffic_simulator's
+  src/entity/ego_entity.cpp) MUST be declared here, or `ros2 launch` aborts with
+  "not a valid argument". The awf/core argument set is deliberately smaller than Universe's:
+  core has no field-operator-assistance stack and no traffic light arbiter, so use_foa and
+  perception/enable_traffic_light are not pushed and must not be declared.
+-->
+<launch>
+  <!-- =========================================================================
+       Arguments pushed by scenario_simulator_v2 (ego_entity.cpp:46-70)
+       ========================================================================= -->
+  <arg name="map_path"                        description="directory holding lanelet2_map.osm"/>
+  <arg name="vehicle_model"                   default="autoware_sample_vehicle"/>
+  <arg name="sensor_model"                    default="autoware_sample_sensor_kit"/>
+  <arg name="use_sim_time"                    default="false"/>
+  <arg name="localization_sim_mode"           default="api"
+       description="api = SSV2 fakes localization (P0). pose_twist_estimator = core EKF in loop (P2)."/>
+  <!-- accepted-and-ignored: the simulator pushes these unconditionally -->
+  <arg name="lanelet2_map_file"               default="lanelet2_map.osm"/>
+  <arg name="pointcloud_map_file"             default="pointcloud_map.pcd"/>
+  <arg name="rviz_config"                     default=""/>
+  <arg name="scenario_simulation"             default="true"/>
+  <arg name="vehicle_id"                      default="default"/>
+  <!-- Pushed for awf/core specifically. autoware_core.launch.xml launches RViz
+       unconditionally, which is fatal for headless CI; this is the argument core is missing. -->
+  <arg name="launch_rviz"                     default="false"/>
+
+  <!-- =========================================================================
+       Prototype knobs
+       ========================================================================= -->
+  <arg name="profile"                  default="P0"
+       description="Evaluation profile. P0 = simulator fakes localization and detection;
+                    P2 = core localization in the loop; P3 = core perception from raw LiDAR.
+                    Decides which interfaces and metrics are judged -- see
+                    autoware_core_component_evaluator/expectation/README.md."/>
+  <arg name="startup_stop_delay_s"     default="2.0"
+       description="Fallback delay before the shim latches STOP if nothing has asked for a
+                    mode. Only a floor -- an explicit AD API request always wins."/>
+  <arg name="launch_evaluator"         default="true"/>
+  <arg name="evaluation_report_path"   default="/tmp/core_component_report.json"/>
+  <arg name="scenario_name"            default=""/>
+  <arg name="launch_map"               default="true"/>
+  <arg name="launch_pointcloud_map"    default="false"
+       description="P0/P2 need no pointcloud map (no NDT). Keeping it off avoids the
+                    pcd metadata requirement and saves ~40 MB of load."/>
+  <arg name="launch_perception"        default="true"/>
+  <arg name="launch_sensing"           default="true"/>
+  <arg name="launch_localization"      default="true"/>
+  <arg name="launch_planning"          default="true"/>
+  <arg name="launch_control"           default="true"/>
+  <arg name="launch_vehicle"           default="true"/>
+  <arg name="launch_api"               default="true"/>
+  <arg name="shim_standalone_mode"     default="true"
+       description="true  = the shim OWNS OperationModeState (required for autoware_core &lt; 1.8,
+                            which has no autoware_command_gate).
+                    false = delegate to /system/operation_mode/change_operation_mode."/>
+
+  <!-- quoting follows autoware_core_localization.launch.xml:87 -->
+  <let name="sim_loc" value="$(eval &quot;'$(var localization_sim_mode)' == 'api'&quot;)"/>
+  <let name="use_command_gate" value="$(eval &quot;'$(var shim_standalone_mode)'.lower() not in ('true','1')&quot;)"/>
+
+  <!-- =========================================================================
+       Global parameters (vehicle_info + use_sim_time), unscoped so all nodes see them
+       ========================================================================= -->
+  <group scoped="false">
+    <include file="$(find-pkg-share autoware_global_parameter_loader)/launch/global_params.launch.py">
+      <arg name="use_sim_time"  value="$(var use_sim_time)"/>
+      <arg name="vehicle_model" value="$(var vehicle_model)"/>
+    </include>
+  </group>
+
+  <!-- =========================================================================
+       MAP
+       Note: map_projector_info.yaml is intentionally NOT required.
+       autoware_map_projection_loader falls back to deriving the projection from
+       lanelet2_map.osm (MGRS for kashiwanoha, which carries real lat/lon).
+       ========================================================================= -->
+  <!--
+    Params come from autoware_core_map's OWN config files via allow_substs, not hand-written
+    here. Hand-writing them breaks the moment core adds a parameter: you get
+    "expected [bool] got [not set]" at startup. This way the params always match the binary.
+  -->
+  <!--
+    These <let>s satisfy the $(var ...) substitutions inside autoware_core_map's own configs
+    (the set differs between core versions, so declare all of them).
+    Missing files are fine and deliberate:
+      map_projector_info.yaml      -> map_projection_loader derives MGRS from the .osm instead
+      lanelet2_map_metadata.yaml   -> loader computes bounding boxes from map points when absent
+      pointcloud_map_metadata.yaml -> only read when launch_pointcloud_map:=true
+  -->
+  <let name="lanelet2_map_path"            value="$(var map_path)/lanelet2_map.osm"/>
+  <let name="lanelet2_map_metadata_path"   value="$(var map_path)/lanelet2_map_metadata.yaml"/>
+  <let name="map_projector_info_path"      value="$(var map_path)/map_projector_info.yaml"/>
+  <let name="pointcloud_map_path"          value="$(var map_path)/pointcloud_map.pcd"/>
+  <let name="pointcloud_map_metadata_path" value="$(var map_path)/pointcloud_map_metadata.yaml"/>
+
+  <group if="$(var launch_map)">
+    <push-ros-namespace namespace="map"/>
+
+    <node pkg="autoware_map_loader" exec="autoware_lanelet2_map_loader" name="lanelet2_map_loader">
+      <param from="$(find-pkg-share autoware_core_map)/config/lanelet2_map_loader.param.yaml"
+             allow_substs="true"/>
+    </node>
+
+    <node pkg="autoware_map_projection_loader" exec="autoware_map_projection_loader_node"
+          name="map_projection_loader">
+      <param from="$(find-pkg-share autoware_core_map)/config/map_projection_loader.param.yaml"
+             allow_substs="true"/>
+    </node>
+
+    <node pkg="autoware_lanelet2_map_visualizer" exec="autoware_lanelet2_map_visualizer"
+          name="lanelet2_map_visualization" output="both">
+      <remap from="input/lanelet2_map" to="vector_map"/>
+      <remap from="output/lanelet2_map_marker" to="vector_map_marker"/>
+    </node>
+
+    <node pkg="autoware_map_loader" exec="autoware_pointcloud_map_loader" name="pointcloud_map_loader"
+          if="$(var launch_pointcloud_map)">
+      <param from="$(find-pkg-share autoware_core_map)/config/pointcloud_map_loader.param.yaml"
+             allow_substs="true"/>
+      <param name="pcd_paths_or_directory" value="[$(var pointcloud_map_path)]"/>
+      <param name="pcd_metadata_path"
+             value="$(var map_path)/pointcloud_map_metadata.yaml"/>
+      <remap from="output/pointcloud_map" to="pointcloud_map"/>
+      <remap from="output/pointcloud_map_metadata" to="pointcloud_map_metadata"/>
+      <remap from="service/get_partial_pcd_map" to="/map/get_partial_pointcloud_map"/>
+      <remap from="service/get_differential_pcd_map" to="/map/get_differential_pointcloud_map"/>
+      <remap from="service/get_selected_pcd_map" to="/map/get_selected_pointcloud_map"/>
+    </node>
+  </group>
+
+  <!-- =========================================================================
+       SENSING  (/vehicle/status/velocity_status -> twist_with_covariance)
+       ========================================================================= -->
+  <group if="$(var launch_sensing)">
+    <include file="$(find-pkg-share autoware_core_sensing)/launch/autoware_core_sensing.launch.xml"/>
+  </group>
+
+  <!-- =========================================================================
+       LOCALIZATION
+       P0: pose_initializer ONLY. SSV2 publishes /localization/kinematic_state and
+           /localization/acceleration itself, so running core's ekf_localizer /
+           stop_filter / twist2accel here would put two publishers on those topics.
+           pose_initializer is still required: it is what makes
+           /api/localization/initialization_state real (concealer's ADAPI triple).
+       P2: full core localization; SSV2 injects at the pose_estimator output instead.
+       ========================================================================= -->
+  <group if="$(var launch_localization)">
+    <group if="$(var sim_loc)">
+      <include file="$(find-pkg-share autoware_core_scenario_launch)/launch/pose_initializer_only.launch.xml"/>
+    </group>
+    <group unless="$(var sim_loc)">
+      <include file="$(find-pkg-share autoware_core_localization)/launch/autoware_core_localization.launch.xml"/>
+    </group>
+  </group>
+
+  <!-- =========================================================================
+       PERCEPTION
+       Safe in P0: ground_filter and euclidean_cluster only publish from inside their
+       input callback, and nothing publishes /sensing/lidar/top/pointcloud_raw_ex, so
+       they idle. objects_converter picks up SSV2's injected
+       /perception/object_recognition/detection/objects.
+       ========================================================================= -->
+  <group if="$(var launch_perception)">
+    <include file="$(find-pkg-share autoware_core_perception)/launch/autoware_core_perception.launch.xml"/>
+  </group>
+
+  <!-- =========================================================================
+       PLANNING  (mission -> path_generator -> bvp -> converter -> mvp -> smoother)
+       ========================================================================= -->
+  <group if="$(var launch_planning)">
+    <include file="$(find-pkg-share autoware_core_planning)/launch/autoware_core_planning.launch.xml">
+      <arg name="is_simulation" value="true"/>
+    </include>
+  </group>
+
+  <!-- =========================================================================
+       CONTROL  (simple_pure_pursuit -> /control/command/control_cmd)
+       ========================================================================= -->
+  <!--
+    autoware_command_gate exists only in autoware_core >= 1.8, and it owns OperationModeState.
+    Launch it ONLY when the shim is delegating (shim_standalone_mode:=false), otherwise both would
+    publish /api/operation_mode/state and concealer would see interleaved values.
+    Older core: leave shim_standalone_mode:=true (the default) and this stays off.
+  -->
+  <group if="$(var launch_control)">
+    <include file="$(find-pkg-share autoware_core_control)/launch/autoware_core_control.launch.xml"/>
+  </group>
+
+  <!--
+    The command gate is launched directly rather than via autoware_core_control's
+    launch_command_gate argument, because that argument only exists in autoware_core >= 1.8 and
+    passing an undeclared argument aborts the whole launch. Doing it here works on both.
+  -->
+  <group if="$(var launch_control)">
+    <group if="$(var use_command_gate)">
+      <push-ros-namespace namespace="control"/>
+      <node pkg="autoware_command_gate" exec="autoware_command_gate_exe"
+            name="autoware_command_gate" output="screen"/>
+    </group>
+  </group>
+
+  <!-- =========================================================================
+       VEHICLE  (robot_state_publisher: base_link -> sensor frames)
+       ========================================================================= -->
+  <group if="$(var launch_vehicle)">
+    <include file="$(find-pkg-share autoware_core_vehicle)/launch/autoware_core_vehicle.launch.xml">
+      <arg name="vehicle_model" value="$(var vehicle_model)"/>
+      <arg name="sensor_model"  value="$(var sensor_model)"/>
+    </include>
+  </group>
+
+  <!-- =========================================================================
+       API  (default_adapi: interface / localization / routing)
+       ========================================================================= -->
+  <group if="$(var launch_api)">
+    <include file="$(find-pkg-share autoware_core_api)/launch/autoware_core_api.launch.xml">
+      <arg name="launch_rviz_adaptors" value="true"/>
+    </include>
+  </group>
+
+  <!-- =========================================================================
+       AD API OPERATION MODE
+       The one control-plane gap left after the AWF interface migration: autoware_core has no
+       operation_mode node, so /api/operation_mode/state has no publisher and concealer's
+       lifecycle never leaves INITIALIZING. Everything else concealer needs is now served by
+       core's own default_adapi. Retired by an upstream OperationModeNode.
+       ========================================================================= -->
+  <node pkg="autoware_core_adapi_compat" exec="adapi_operation_mode" name="adapi_operation_mode"
+        output="screen">
+    <param name="standalone_mode"      value="$(var shim_standalone_mode)"/>
+    <param name="startup_stop_delay_s" value="$(var startup_stop_delay_s)"/>
+  </node>
+
+  <!-- =========================================================================
+       COMPONENT EVALUATION
+       Interface conformance + timing + validity per component, and the accuracy metrics that
+       only ground truth makes possible. Publishes every metric on /metrics/<name> as
+       UserDefinedValue, so a scenario can gate on any of them directly.
+       ========================================================================= -->
+  <include file="$(find-pkg-share autoware_core_component_evaluator)/launch/component_evaluator.launch.xml"
+           if="$(var launch_evaluator)">
+    <arg name="profile"     value="$(var profile)"/>
+    <arg name="scenario"    value="$(var scenario_name)"/>
+    <arg name="report_path" value="$(var evaluation_report_path)"/>
+  </include>
+
+  <!-- =========================================================================
+       RVIZ (off by default: the simulator has its own; enable for demos)
+       ========================================================================= -->
+  <node pkg="rviz2" exec="rviz2" name="rviz2" output="log" if="$(var launch_rviz)"
+        args="-d $(find-pkg-share autoware_core)/rviz/autoware_core.rviz"/>
+</launch>

@@ -1,0 +1,45 @@
+# autoware_pose_initializer configuration for the P0/P1 test profiles.
+#
+# Derived from autoware_core_localization/config/pose_initializer.param.yaml with the 4
+# estimator hooks turned OFF. See launch/pose_initializer_only.launch.xml for rationale.
+/**:
+  ros__parameters:
+    user_defined_initial_pose:
+      enable: false
+      pose: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0]
+
+    gnss_pose_timeout: 3.0 # [sec]
+    stop_check_duration: 3.0 # [sec]
+    pose_error_threshold: 5.0 # [m]
+    pose_error_check_enabled: false
+
+    # The 4 flags that make this work with scenario_simulator_v2
+    ekf_enabled: false        # no EKF in P0 (SSV2 publishes kinematic_state directly)
+    gnss_enabled: false       # avoids MapHeightFitter's unbounded wait_for_service()
+    yabloc_enabled: false
+    ndt_enabled: false        # SSV2 LiDAR sees entities only => nothing for NDT to align to
+    stop_check_enabled: false # no twist-buffer precondition at initialize time
+
+    map_height_fitter:
+      map_loader_name: "/map/pointcloud_map_loader"
+      target: "pointcloud_map"
+
+    gnss_particle_covariance:
+      [
+        1.0, 0.0, 0.0,  0.0,  0.0,  0.0,
+        0.0, 1.0, 0.0,  0.0,  0.0,  0.0,
+        0.0, 0.0, 0.01, 0.0,  0.0,  0.0,
+        0.0, 0.0, 0.0,  0.01, 0.0,  0.0,
+        0.0, 0.0, 0.0,  0.0,  0.01, 0.0,
+        0.0, 0.0, 0.0,  0.0,  0.0,  10.0,
+      ]
+
+    output_pose_covariance:
+      [
+        1.0, 0.0, 0.0,  0.0,  0.0,  0.0,
+        0.0, 1.0, 0.0,  0.0,  0.0,  0.0,
+        0.0, 0.0, 0.01, 0.0,  0.0,  0.0,
+        0.0, 0.0, 0.0,  0.01, 0.0,  0.0,
+        0.0, 0.0, 0.0,  0.0,  0.01, 0.0,
+        0.0, 0.0, 0.0,  0.0,  0.0,  0.2,
+      ]
