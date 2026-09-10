@@ -1,0 +1,259 @@
+# core_all_components.yaml
+#
+# One scenario that exercises all six Autoware components -- map, sensing, localization,
+# perception, planning, control (plus vehicle and the AD API) -- and gates on a metric from each.
+#
+# The Ego initialises, receives a route, engages, drives to a goal, and the run passes only if
+# every one of the gates below also holds. Each gate is a UserDefinedValueCondition bound to a
+# topic that autoware_core_component_evaluator publishes, so a component-level regression fails
+# the scenario in exactly the same way a functional one does, and lands in the same JUnit XML.
+#
+# WHICH COMPONENT EACH GATE COVERS
+#
+#   planning      planning_trajectory_rate_hz, planning_check_failures,
+#                 planning_time_from_route_to_trajectory_s
+
+#   control       control_command_rate_hz, control_max_lateral_deviation_m, control_max_jerk_mps3
+
+#   perception    perception_objects_rate_hz
+
+#   localization  localization_kinematic_state_rate_hz
+
+#   vehicle       vehicle_velocity_status_rate_hz
+
+#   api / system  api_operation_mode_state_available
+
+#   map           covered by the evaluator's own report rather than a gate: a failed map load
+#                 makes planning emit nothing, so planning_trajectory_rate_hz fails first and
+#                 the report names the map as the cause.
+#
+# The full 52-metric report is written to /tmp/core_component_report.json regardless of whether
+# a gate fires. These are only the ones promoted to pass/fail.
+#
+# Derived from scenario_test_runner/scenario/sample.yaml (the kashiwanoha Ego scenario), 
+# with one deliberate removal:
+#
+#   sample.yaml asserts `ego.currentMinimumRiskManeuverState.state == NORMAL`, which requires
+#   /api/fail_safe/mrm_state. autoware_core has no MRM/fail-safe API at all, and concealer's
+#   minimum_risk_maneuver_state defaults to an empty string, so that condition can never be
+#   satisfied. It is intentionally absent here -- see
+#   evaluation/autoware_core_component_evaluator/expectation/api.yaml.
+OpenSCENARIO:
+  FileHeader:
+    author: 'TranHuuNhatHuy'
+    date: '2026-07-31T21:00:00+09:00'
+    description: 'autoware_core all-component test: full lifecycle with per-component gates'
+    revMajor: 1
+    revMinor: 0
+  ParameterDeclarations:
+    ParameterDeclaration: []
+  CatalogLocations:
+    VehicleCatalog:
+      Directory:
+        path: $(ros2 pkg prefix --share openscenario_experimental_catalog)/vehicle
+  RoadNetwork:
+    LogicFile:
+      filepath: $(ros2 pkg prefix --share kashiwanoha_map)/map
+  Entities:
+    ScenarioObject:
+      - name: ego
+        CatalogReference:
+          catalogName: sample_vehicle
+          entryName: sample_vehicle
+        ObjectController:
+          Controller:
+            name: 'Autoware'
+            Properties:
+              Property:
+                - name: maxJerk
+                  value: '1.5'
+                - name: minJerk
+                  value: '-1.5'
+  Storyboard:
+    Init:
+      Actions:
+        Private:
+          - entityRef: ego
+            PrivateAction:
+              - TeleportAction:
+                  Position:
+                    LanePosition:
+                      roadId: ''
+                      laneId: '34513'
+                      s: 1
+                      offset: 0
+                      Orientation:
+                        type: relative
+                        h: 0
+                        p: 0
+                        r: 0
+              - RoutingAction:
+                  AcquirePositionAction:
+                    Position:
+                      LanePosition:
+                        roadId: ''
+                        laneId: '34507'
+                        s: 50
+                        offset: 0
+                        Orientation:
+                          type: relative
+                          h: 0
+                          p: 0
+                          r: 0
+    Story:
+      - name: ''
+        Act:
+          - name: _EndCondition
+            ManeuverGroup:
+              - maximumExecutionCount: 1
+                name: ''
+                Actors:
+                  selectTriggeringEntities: false
+                  EntityRef:
+                    - entityRef: ego
+                Maneuver:
+                  - name: ''
+                    Event:
+                      # ---- SUCCESS: goal reached AND every KPI within budget ----
+                      - name: goal_and_kpis_ok
+                        priority: parallel
+                        StartTrigger:
+                          ConditionGroup:
+                            - Condition:
+                                - name: goal_reached
+                                  delay: 0
+                                  conditionEdge: none
+                                  ByEntityCondition:
+                                    TriggeringEntities:
+                                      triggeringEntitiesRule: any
+                                      EntityRef:
+                                        - entityRef: ego
+                                    EntityCondition:
+                                      ReachPositionCondition:
+                                        Position:
+                                          LanePosition:
+                                            roadId: ''
+                                            laneId: '34507'
+                                            s: 50
+                                            offset: 0
+                                            Orientation:
+                                              type: relative
+                                              h: 0
+                                              p: 0
+                                              r: 0
+                                        tolerance: 3.0
+                                - name: kpi_planning_trajectory_rate
+                                  delay: 0
+                                  conditionEdge: none
+                                  ByValueCondition:
+                                    UserDefinedValueCondition:
+                                      name: /metrics/planning_trajectory_rate_hz
+                                      rule: greaterThan
+                                      value: '8.0'
+                                - name: kpi_planning_no_malformed_trajectory
+                                  delay: 0
+                                  conditionEdge: none
+                                  ByValueCondition:
+                                    UserDefinedValueCondition:
+                                      name: /metrics/planning_check_failures
+                                      rule: lessThan
+                                      value: '0.5'
+                                - name: kpi_planning_route_to_trajectory_latency
+                                  delay: 0
+                                  conditionEdge: none
+                                  ByValueCondition:
+                                    UserDefinedValueCondition:
+                                      name: /metrics/planning_time_from_route_to_trajectory_s
+                                      rule: lessThan
+                                      value: '10.0'
+                                - name: kpi_control_command_rate
+                                  delay: 0
+                                  conditionEdge: none
+                                  ByValueCondition:
+                                    UserDefinedValueCondition:
+                                      name: /metrics/control_command_rate_hz
+                                      rule: greaterThan
+                                      value: '20.0'
+                                - name: kpi_control_lateral_deviation
+                                  delay: 0
+                                  conditionEdge: none
+                                  ByValueCondition:
+                                    UserDefinedValueCondition:
+                                      name: /metrics/control_max_lateral_deviation_m
+                                      rule: lessThan
+                                      value: '1.0'
+                                - name: kpi_control_jerk
+                                  delay: 0
+                                  conditionEdge: none
+                                  ByValueCondition:
+                                    UserDefinedValueCondition:
+                                      name: /metrics/control_max_jerk_mps3
+                                      rule: lessThan
+                                      value: '30.0'
+                                - name: kpi_perception_objects_rate
+                                  delay: 0
+                                  conditionEdge: none
+                                  ByValueCondition:
+                                    UserDefinedValueCondition:
+                                      name: /metrics/perception_objects_rate_hz
+                                      rule: greaterThan
+                                      value: '5.0'
+                                - name: kpi_localization_state_rate
+                                  delay: 0
+                                  conditionEdge: none
+                                  ByValueCondition:
+                                    UserDefinedValueCondition:
+                                      name: /metrics/localization_kinematic_state_rate_hz
+                                      rule: greaterThan
+                                      value: '20.0'
+                                - name: kpi_vehicle_velocity_status_rate
+                                  delay: 0
+                                  conditionEdge: none
+                                  ByValueCondition:
+                                    UserDefinedValueCondition:
+                                      name: /metrics/vehicle_velocity_status_rate_hz
+                                      rule: greaterThan
+                                      value: '20.0'
+                                - name: kpi_operation_mode_published
+                                  delay: 0
+                                  conditionEdge: none
+                                  ByValueCondition:
+                                    UserDefinedValueCondition:
+                                      name: /metrics/api_operation_mode_state_available
+                                      rule: greaterThan
+                                      value: '0.5'
+                        Action:
+                          - name: ''
+                            UserDefinedAction:
+                              CustomCommandAction:
+                                type: exitSuccess
+                      # ---- FAILURE: timeout ----
+                      - name: timeout
+                        priority: parallel
+                        StartTrigger:
+                          ConditionGroup:
+                            - Condition:
+                                - name: ''
+                                  delay: 0
+                                  conditionEdge: none
+                                  ByValueCondition:
+                                    SimulationTimeCondition:
+                                      value: 180
+                                      rule: greaterThan
+                        Action:
+                          - name: ''
+                            UserDefinedAction:
+                              CustomCommandAction:
+                                type: exitFailure
+            StartTrigger:
+              ConditionGroup:
+                - Condition:
+                    - name: ''
+                      delay: 0
+                      conditionEdge: none
+                      ByValueCondition:
+                        SimulationTimeCondition:
+                          value: 0
+                          rule: greaterThan
+    StopTrigger:
+      ConditionGroup: []
