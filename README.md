@@ -243,14 +243,14 @@ feature.
 
 Fetched via `dependency.repos`. The six required changes are commits on
 `TranHuuNhatHuy/scenario_simulator_v2:feat/awf-core`, each carrying TIER IV's copyright headers
-unmodified and stating what changed and why. See [docs/FORK.md](docs/FORK.md) and `NOTICE`.
+unmodified and stating what changed and why. See [docs/FORK.md](docs/FORK.md) and [NOTICE](NOTICE).
 
 Two scenarios are *derived* from upstream's `sample.yaml` and say so in their own headers.
 `scenarios/core_smoke.yaml` removes upstream's
 `currentMinimumRiskManeuverState == NORMAL` assertion: it needs `/api/fail_safe/mrm_state`, which
 core has no MRM to publish, so it could never be satisfied.
 
-### From `autoware_core` - **3 files, each named in `NOTICE`**
+### From `autoware_core` - 3 files, each named in [NOTICE](NOTICE)
 
 | File | Relationship |
 |---|---|
@@ -281,5 +281,5 @@ timer → the 20 Hz control floor; `behavior_velocity_planner` publishing
 
 ## License
 
-Apache License 2.0. See `LICENSE` for the licence and `NOTICE` for attribution of the derived
+Apache License 2.0. See [LICENSE](LICENSE) for the licence and [NOTICE](NOTICE) for attribution of the derived
 files and the fork branch.
