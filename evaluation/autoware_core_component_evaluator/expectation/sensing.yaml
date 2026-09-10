@@ -1,0 +1,55 @@
+component: sensing
+title: Sensing
+description: >
+  autoware_vehicle_velocity_converter, and in P3 the LiDAR preprocessing chain. In P0 and P2 the
+  simulator injects the point cloud directly at /perception/obstacle_segmentation/pointcloud, so
+  the only sensing interface under test is the velocity converter -- which is not a small thing:
+  it feeds gyro_odometer and ekf_localizer, and a stale twist there silently degrades every pose
+  downstream.
+
+interfaces:
+  - name: /sensing/vehicle_velocity_converter/twist_with_covariance
+    direction: output
+    required_in: [P0, P2, P3]
+    rate: {min_hz: 20.0, max_hz: 120.0}
+    max_gap_s: 0.3
+    latency_max_ms: 150
+    checks: [finite, covariance_valid]
+    note: >
+      Driven by /vehicle/status/velocity_status, which the simulator publishes at the scenario
+      frame rate (30 Hz by default). The 20 Hz floor leaves headroom for a loaded machine.
+
+  - name: /perception/obstacle_segmentation/pointcloud
+    type: sensor_msgs/msg/PointCloud2
+    from_manifest: false
+    direction: output
+    required_in: [P3]
+    rate: {min_hz: 5.0}
+    max_gap_s: 1.0
+    note: >
+      In P0/P2 this is the simulator's LiDAR bridge output, not core's; it is judged only in P3,
+      where core's own ground_filter produces it. Not declared in core's interface manifest --
+      an upstream gap worth closing, since three planning modules subscribe to it.
+
+metrics:
+  - name: sensing_twist_rate_hz
+    unit: Hz
+    interface: /sensing/vehicle_velocity_converter/twist_with_covariance
+    statistic: rate_hz
+    gate: {min: 20.0}
+    required_in: [P0, P2, P3]
+
+  - name: sensing_twist_max_gap_s
+    unit: s
+    interface: /sensing/vehicle_velocity_converter/twist_with_covariance
+    statistic: max_gap_s
+    gate: {max: 0.3}
+    required_in: [P0, P2, P3]
+    note: A stall here is invisible in the mean rate and degrades every pose downstream.
+
+  - name: sensing_twist_check_failures
+    unit: count
+    interface: /sensing/vehicle_velocity_converter/twist_with_covariance
+    statistic: check_failures
+    gate: {max: 0.0}
+    required_in: [P0, P2, P3]
