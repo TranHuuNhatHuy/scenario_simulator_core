@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<launch>
+  <!-- Which evaluation profile is in force. Interfaces and metrics not required in this profile
+       are reported NOT_APPLICABLE rather than judged. See expectation/README.md. -->
+  <arg name="profile" default="P0"/>
+  <arg name="scenario" default=""/>
+  <arg name="report_path" default="/tmp/core_component_report.json"/>
+  <arg name="publish_period_s" default="1.0"/>
+  <!-- Nothing is judged during warm-up: Autoware's first seconds are legitimately ragged while
+       nodes discover each other, and gating on that measures the launch system. -->
+  <arg name="warmup_s" default="5.0"/>
+  <arg name="expectation_directory" default=""/>
+
+  <node pkg="autoware_core_component_evaluator" exec="component_evaluator" name="component_evaluator" output="screen">
+    <param name="profile" value="$(var profile)"/>
+    <param name="scenario" value="$(var scenario)"/>
+    <param name="report_path" value="$(var report_path)"/>
+    <param name="publish_period_s" value="$(var publish_period_s)"/>
+    <param name="warmup_s" value="$(var warmup_s)"/>
+    <param name="expectation_directory" value="$(var expectation_directory)"/>
+  </node>
+</launch>
