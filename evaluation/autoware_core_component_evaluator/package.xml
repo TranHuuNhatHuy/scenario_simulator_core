@@ -1,0 +1,54 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>autoware_core_component_evaluator</name>
+  <version>0.1.0</version>
+  <description>
+    Per-component evaluation of a running autoware_core: interface conformance against the
+    component interface specs core publishes itself, timing and validity measurement per
+    interface, and accuracy metrics against scenario_simulator ground truth.
+
+    Every metric is published as autoware_scenario_simulation_msgs/UserDefinedValue on /metrics/&lt;name&gt;,
+    which openscenario_interpreter's UserDefinedValueCondition binds directly -- so a metric
+    threshold is a scenario pass/fail gate with no interpreter change, and metric failures land in
+    the same JUnit XML as functional ones.
+  </description>
+  <maintainer email="huy.tran@tier4.jp">Huy Tran</maintainer>
+  <license>Apache License 2.0</license>
+
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>ament_index_python</exec_depend>
+  <exec_depend>rosidl_runtime_py</exec_depend>
+  <exec_depend>python3-yaml</exec_depend>
+
+  <exec_depend>autoware_component_evaluation_msgs</exec_depend>
+  <exec_depend>autoware_scenario_simulation_msgs</exec_depend>
+  <exec_depend>autoware_internal_metric_msgs</exec_depend>
+
+  <!-- Message packages whose types are resolved at runtime. Declared so that rosdep installs
+       them; a missing one is reported as an unobservable interface rather than a crash. -->
+  <exec_depend>autoware_adapi_v1_msgs</exec_depend>
+  <exec_depend>autoware_control_msgs</exec_depend>
+  <exec_depend>autoware_internal_planning_msgs</exec_depend>
+  <exec_depend>autoware_map_msgs</exec_depend>
+  <exec_depend>autoware_perception_msgs</exec_depend>
+  <exec_depend>autoware_planning_msgs</exec_depend>
+  <exec_depend>autoware_vehicle_msgs</exec_depend>
+  <exec_depend>geometry_msgs</exec_depend>
+  <exec_depend>nav_msgs</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
+  <exec_depend>traffic_simulator_msgs</exec_depend>
+
+  <!-- Optional: when present, its interface_manifest.json supplies the structural half of every
+       contract entry. Absent, every interface is reported as undeclared. -->
+  <exec_depend>autoware_component_interface_specs</exec_depend>
+
+  <test_depend>ament_copyright</test_depend>
+  <test_depend>ament_flake8</test_depend>
+  <test_depend>ament_pep257</test_depend>
+  <test_depend>python3-pytest</test_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>
