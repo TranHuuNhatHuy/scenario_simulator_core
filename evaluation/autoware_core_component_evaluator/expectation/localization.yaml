@@ -1,0 +1,114 @@
+component: localization
+title: Localization
+description: >
+  In P0 the simulator supplies the pose and localization is only a pass-through, so only liveness
+  and validity are judged. In P2 (localization_sim_mode:=pose_twist_estimator) core's own
+  ekf_localizer, stop_filter and twist2accel are in the loop, and the accuracy metrics below
+  become the point of the whole exercise: the simulator knows the ego's exact pose, so
+  localization_ate_m is a true absolute trajectory error rather than the self-consistency figure a
+  covariance would give.
+
+  NDT is out of scope in every profile and always will be with this simulator: the LiDAR model
+  raycasts spawned entities only, never the map, so there is no environment geometry for a scan
+  matcher to align against. That is a property of the simulator, not a gap in core.
+
+interfaces:
+  - name: /localization/kinematic_state
+    direction: output
+    required_in: [P0, P2, P3]
+    rate: {min_hz: 20.0, max_hz: 200.0}
+    max_gap_s: 0.25
+    max_jitter_s: 0.08
+    latency_max_ms: 150
+    checks: [finite, pose_plausible, covariance_valid]
+    note: >
+      Consumed by mission_planner, path_generator, both velocity planners and the controller. Its
+      worst gap bounds the staleness of every one of them.
+
+  - name: /localization/acceleration
+    direction: output
+    required_in: [P0, P2, P3]
+    rate: {min_hz: 10.0, max_hz: 200.0}
+    max_gap_s: 0.5
+    checks: [finite, covariance_valid]
+
+  - name: /localization/initialization_state
+    direction: output
+    required_in: [P0, P2, P3]
+    rate: {min_hz: 0.0}
+    note: TRANSIENT_LOCAL. Reaching INITIALIZED is what moves the lifecycle out of INITIALIZING.
+
+  - name: /localization/initialize
+    kind: service
+    direction: input
+    required_in: [P0, P2, P3]
+    note: >
+      Services cannot be measured by subscription; this entry documents the contract and is
+      reported from graph introspection only.
+
+metrics:
+  - name: localization_kinematic_state_rate_hz
+    unit: Hz
+    interface: /localization/kinematic_state
+    statistic: rate_hz
+    gate: {min: 20.0}
+    required_in: [P0, P2, P3]
+
+  - name: localization_kinematic_state_max_gap_s
+    unit: s
+    interface: /localization/kinematic_state
+    statistic: max_gap_s
+    gate: {max: 0.25}
+    required_in: [P0, P2, P3]
+
+  - name: localization_kinematic_state_jitter_s
+    unit: s
+    interface: /localization/kinematic_state
+    statistic: jitter_s
+    gate: {max: 0.08}
+    required_in: [P2, P3]
+
+  - name: localization_check_failures
+    unit: count
+    interface: /localization/kinematic_state
+    statistic: check_failures
+    gate: {max: 0.0}
+    required_in: [P0, P2, P3]
+
+  - name: localization_time_to_initialized_s
+    unit: s
+    derived: time_to_localization_initialized_s
+    gate: {max: 60.0}
+    required_in: [P0, P2, P3]
+    note: Bring-up regression detector. Concealer's own budget for this is initialize_duration.
+
+  - name: localization_ate_m
+    unit: m
+    derived: localization_ate_m
+    gate: {max: 0.5}
+    required_in: [P2, P3]
+    note: >
+      RMS position error against the simulator's ground-truth ego pose on
+      /simulation/entity/status. Only meaningful when core is actually estimating the pose, hence
+      P2 onward -- in P0 the simulator supplies the pose and this measures nothing but plumbing.
+
+  - name: localization_max_position_error_m
+    unit: m
+    derived: localization_max_position_error_m
+    gate: {max: 1.5}
+    required_in: [P2, P3]
+
+  - name: localization_heading_error_rad
+    unit: rad
+    derived: localization_heading_error_rad
+    gate: {max: 0.1}
+    required_in: [P2, P3]
+
+  - name: localization_max_pose_jump_m
+    unit: m
+    derived: localization_max_pose_jump_m
+    gate: {max: 1.0}
+    required_in: [P2, P3]
+    note: >
+      Discontinuity detector: a step larger than the elapsed time allows is a filter reset or a
+      bad correction, not motion. Averages hide it; this does not.
