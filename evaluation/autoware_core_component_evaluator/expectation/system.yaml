@@ -1,0 +1,52 @@
+component: system
+title: System
+description: >
+  Operation mode: the state machine that decides whether Autoware is driving. autoware_core has
+  no system component of its own -- autoware_command_gate owns /system/operation_mode/state where
+  it is launched, and the ADAPI compatibility node in core_adapter/autoware_core_adapi_compat owns
+  it otherwise.
+
+  This is the single most load-bearing interface in the whole integration. concealer derives its
+  entire lifecycle from three ADAPI topics, and operation mode is the one autoware_core does not
+  implement. When it is missing, LegacyAutowareState is pinned at INITIALIZING forever and every
+  scenario times out with no other symptom.
+
+interfaces:
+  - name: /system/operation_mode/state
+    direction: output
+    required_in: [P0, P2, P3]
+    rate: {min_hz: 0.0}
+    note: >
+      TRANSIENT_LOCAL. Read by mission_planner (reroute gating) and velocity_smoother. A VOLATILE
+      subscriber that joins late gets nothing, which is why the declared QoS is used here.
+
+  - name: /system/operation_mode/change_operation_mode
+    kind: service
+    direction: input
+    required_in: [P0, P2, P3]
+    note: >
+      autoware_default_adapi's routing node holds a client for this and calls it on reroute. With
+      command_gate absent and nothing else serving it, a reroute hangs until timeout.
+
+metrics:
+  - name: system_operation_mode_available
+    unit: bool
+    interface: /system/operation_mode/state
+    statistic: observed
+    gate: {min: 1.0}
+    required_in: [P0, P2, P3]
+
+  - name: system_time_to_autonomous_s
+    unit: s
+    derived: time_to_autonomous_s
+    gate: {max: 120.0}
+    required_in: [P0, P2, P3]
+
+  - name: system_time_from_autonomous_to_motion_s
+    unit: s
+    derived: time_from_autonomous_to_motion_s
+    gate: {max: 10.0}
+    required_in: [P0, P2, P3]
+    note: >
+      Engaged but not moving is the most common integration failure and the least self-explanatory
+      one. Bounding it turns a 180 s scenario timeout into a named failure.
