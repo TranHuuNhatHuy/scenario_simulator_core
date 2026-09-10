@@ -1,0 +1,8 @@
+build/
+install/
+log/
+ws/
+__pycache__/
+*.pyc
+*.xosc
+.pytest_cache/
