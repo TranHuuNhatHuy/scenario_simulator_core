@@ -1,0 +1,49 @@
+component: map
+title: Map
+description: >
+  autoware_map_loader and autoware_map_projection_loader. The map is latched, published once, and
+  consumed by mission_planner, path_generator, behavior_velocity_planner and motion_velocity_planner.
+  Everything downstream of a failed map load fails as a consequence, which is why an empty payload
+  is checked explicitly rather than inferred from a planning failure ten seconds later.
+
+interfaces:
+  - name: /map/vector_map
+    direction: output
+    required_in: [P0, P2, P3]
+    # Published once and latched, so a rate bound is meaningless; presence is the whole test.
+    # max_gap is left unbounded for the same reason.
+    rate: {min_hz: 0.0}
+    checks: [map_nonempty]
+    note: >
+      TRANSIENT_LOCAL in the manifest. A VOLATILE subscriber that joins late receives nothing,
+      which is indistinguishable from a dead publisher -- the evaluator uses the declared QoS.
+
+  - name: /map/map_projector_info
+    direction: output
+    required_in: [P0, P2, P3]
+    rate: {min_hz: 0.0}
+    note: >
+      Decides how lanelet2 coordinates map to the simulator's world frame. A wrong projector puts
+      the ego kilometres off-lane, which presents as "planning emits nothing".
+
+metrics:
+  - name: map_vector_map_available
+    unit: bool
+    interface: /map/vector_map
+    statistic: observed
+    gate: {min: 1.0}
+    required_in: [P0, P2, P3]
+
+  - name: map_projector_info_available
+    unit: bool
+    interface: /map/map_projector_info
+    statistic: observed
+    gate: {min: 1.0}
+    required_in: [P0, P2, P3]
+
+  - name: map_vector_map_check_failures
+    unit: count
+    interface: /map/vector_map
+    statistic: check_failures
+    gate: {max: 0.0}
+    required_in: [P0, P2, P3]
