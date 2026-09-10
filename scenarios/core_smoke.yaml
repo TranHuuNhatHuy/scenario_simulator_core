@@ -1,0 +1,141 @@
+# core_smoke.yaml
+#
+# Minimal closed-loop smoke test: the simulator spawns an Ego whose Autoware is autoware_core,
+# drives it, and exits successfully once it has been DRIVING for a while.
+#
+# No metric gates -- this scenario answers only "does the loop close at all". Run it first when
+# something breaks: if it passes and core_all_components.yaml fails, the failure is a component
+# quality regression rather than an integration failure.
+#
+# Derived from scenario_test_runner/scenario/sample.yaml (the canonical kashiwanoha Ego
+# scenario), with one deliberate removal:
+#
+#   sample.yaml asserts `ego.currentMinimumRiskManeuverState.state == NORMAL`, which requires
+#   /api/fail_safe/mrm_state. autoware_core has no MRM/fail-safe API at all, and concealer's
+#   minimum_risk_maneuver_state defaults to an empty string, so that condition can never be
+#   satisfied. It is intentionally absent here. (See contract/api.yaml.)
+OpenSCENARIO:
+  FileHeader:
+    author: 'Huy Tran'
+    date: '2026-07-31T21:00:00+09:00'
+    description: 'autoware_core smoke test: init -> route -> engage -> drive'
+    revMajor: 1
+    revMinor: 0
+  ParameterDeclarations:
+    ParameterDeclaration: []
+  CatalogLocations:
+    VehicleCatalog:
+      Directory:
+        path: $(ros2 pkg prefix --share openscenario_experimental_catalog)/vehicle
+  RoadNetwork:
+    LogicFile:
+      filepath: $(ros2 pkg prefix --share kashiwanoha_map)/map
+  Entities:
+    ScenarioObject:
+      - name: ego
+        CatalogReference:
+          catalogName: sample_vehicle
+          entryName: sample_vehicle
+        ObjectController:
+          Controller:
+            name: 'Autoware'
+            Properties:
+              Property:
+                - name: maxJerk
+                  value: '1.5'
+                - name: minJerk
+                  value: '-1.5'
+  Storyboard:
+    Init:
+      Actions:
+        Private:
+          - entityRef: ego
+            PrivateAction:
+              - TeleportAction:
+                  Position:
+                    LanePosition:
+                      roadId: ''
+                      laneId: '34513'
+                      s: 1
+                      offset: 0
+                      Orientation:
+                        type: relative
+                        h: 0
+                        p: 0
+                        r: 0
+              - RoutingAction:
+                  AcquirePositionAction:
+                    Position:
+                      LanePosition:
+                        roadId: ''
+                        laneId: '34507'
+                        s: 50
+                        offset: 0
+                        Orientation:
+                          type: relative
+                          h: 0
+                          p: 0
+                          r: 0
+    Story:
+      - name: ''
+        Act:
+          - name: _EndCondition
+            ManeuverGroup:
+              - maximumExecutionCount: 1
+                name: ''
+                Actors:
+                  selectTriggeringEntities: false
+                  EntityRef:
+                    - entityRef: ego
+                Maneuver:
+                  - name: ''
+                    Event:
+                      # ---- SUCCESS: ego has actually moved under autoware_core control ----
+                      - name: drove_far_enough
+                        priority: parallel
+                        StartTrigger:
+                          ConditionGroup:
+                            - Condition:
+                                - name: traveled
+                                  delay: 0
+                                  conditionEdge: none
+                                  ByValueCondition:
+                                    UserDefinedValueCondition:
+                                      name: /metrics/control_traveled_distance_m
+                                      rule: greaterThan
+                                      value: '20.0'
+                        Action:
+                          - name: ''
+                            UserDefinedAction:
+                              CustomCommandAction:
+                                type: exitSuccess
+                      # ---- FAILURE: timeout ----
+                      - name: timeout
+                        priority: parallel
+                        StartTrigger:
+                          ConditionGroup:
+                            - Condition:
+                                - name: ''
+                                  delay: 0
+                                  conditionEdge: none
+                                  ByValueCondition:
+                                    SimulationTimeCondition:
+                                      value: 120
+                                      rule: greaterThan
+                        Action:
+                          - name: ''
+                            UserDefinedAction:
+                              CustomCommandAction:
+                                type: exitFailure
+            StartTrigger:
+              ConditionGroup:
+                - Condition:
+                    - name: ''
+                      delay: 0
+                      conditionEdge: none
+                      ByValueCondition:
+                        SimulationTimeCondition:
+                          value: 0
+                          rule: greaterThan
+    StopTrigger:
+      ConditionGroup: []
