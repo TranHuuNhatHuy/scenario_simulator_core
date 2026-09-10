@@ -1,0 +1,60 @@
+scenario_simulator_core
+Copyright 2026 The Autoware Contributors
+
+This product includes software developed as part of the following projects.
+
+--------------------------------------------------------------------------------
+scenario_simulator_v2
+    https://github.com/tier4/scenario_simulator_v2
+    Copyright TIER IV, Inc.
+    Licensed under the Apache License, Version 2.0
+
+    No source file from scenario_simulator_v2 is redistributed in THIS repository.
+    It is fetched at build time via dependency.repos.
+
+    Six modifications to scenario_simulator_v2 are required by this project and are
+    maintained as a branch on a fork, not as copied files:
+
+        https://github.com/TranHuuNhatHuy/scenario_simulator_v2  (branch feat/awf-core)
+
+    That branch is tier4/scenario_simulator_v2 master plus six commits. Each commit
+    is a derivative work under Apache-2.0 section 4, carries the original TIER IV
+    copyright headers unmodified, and states in its message what was changed and why.
+    docs/FORK.md in this repository summarises them and tracks their upstreaming status.
+
+    Two files in THIS repository are derived from scenario_simulator_v2 rather than
+    written from scratch, and say so in their own headers:
+
+        scenarios/core_smoke.yaml            derived from
+        scenarios/core_all_components.yaml   test_runner/scenario_test_runner/scenario/sample.yaml
+
+--------------------------------------------------------------------------------
+autoware_core
+    https://github.com/autowarefoundation/autoware_core
+    Copyright The Autoware Contributors
+    Licensed under the Apache License, Version 2.0
+
+    No source file from autoware_core is redistributed in this repository except the
+    three below. autoware_core is fetched at build time via dependency.repos, and its
+    launch files and configuration are referenced by
+    core_adapter/autoware_core_scenario_launch rather than reproduced.
+
+        evaluation/autoware_core_component_evaluator/test/interface_manifest.reference.json
+            An unmodified copy of
+            common/autoware_component_interface_specs/interface_manifest.json,
+            used only as a test fixture so the contract tests run without a built
+            autoware_core. Not read at runtime.
+
+        core_adapter/autoware_core_scenario_launch/config/pose_initializer_p0.param.yaml
+            Derived from autoware_pose_initializer/config/pose_initializer.param.yaml.
+            Covariance matrices and thresholds retained verbatim; the five estimator
+            flags resolved to literal false.
+
+        core_adapter/autoware_core_scenario_launch/launch/pose_initializer_only.launch.xml
+            Derived from autoware_pose_initializer/launch/pose_initializer.launch.xml.
+            All ten remappings retained verbatim so the node binds the names
+            autoware_core binds.
+
+--------------------------------------------------------------------------------
+Everything else in this repository is original work, licensed under the Apache
+License, Version 2.0. See LICENSE.
