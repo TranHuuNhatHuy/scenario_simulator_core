@@ -1,154 +1,149 @@
 component: planning
 title: Planning
-description: >
-  The longest chain in core, and the one where a regression is hardest to attribute by reading a
-  bag: mission_planner -> path_generator -> behavior_velocity_planner -> path_to_trajectory
-  converter -> motion_velocity_planner -> velocity_smoother -> /planning/trajectory.
+description: 'The longest chain in core, and the one where a regression is hardest
+  to attribute by reading a bag: mission_planner -> path_generator -> behavior_velocity_planner
+  -> path_to_trajectory converter -> motion_velocity_planner -> velocity_smoother
+  -> /planning/trajectory.
 
-  Each stage is contracted separately for exactly that reason. When /planning/trajectory drops
-  below its floor, the report says which stage stopped rather than that planning did.
+  Each stage is contracted separately for exactly that reason. When /planning/trajectory
+  drops below its floor, the report says which stage stopped rather than that planning
+  did.
 
-  path_generator runs at planning_hz = 10.0 and every stage after it is input-driven, so the whole
-  chain should sit at 10 Hz. The floors are set at 8 Hz to leave headroom on a loaded machine
-  while still catching a halving.
+  path_generator runs at planning_hz = 10.0 and every stage after it is input-driven,
+  so the whole chain should sit at 10 Hz. The floors are set at 8 Hz to leave headroom
+  on a loaded machine while still catching a halving.
 
+  '
 interfaces:
-  - name: /planning/route
-    direction: output
-    required_in: [P0, P2, P3]
-    rate: {min_hz: 0.0}
-    checks: [finite]
-    note: Latched on route set. Presence, not rate, is the test.
+- name: /planning/route
+  direction: output
+  required_in: [P0, P2, P3]
+  rate: {min_hz: 0.0}
+  checks: [finite]
+  note: Latched on route set. Presence, not rate, is the test.
+- name: /planning/route_state
+  direction: output
+  required_in: [P0, P2, P3]
+  rate: {min_hz: 0.0}
+  note: 'UNSET -> SET -> ARRIVED. The ARRIVED transition is what the goal-reached
+    metric reads, and what concealer''s lifecycle needs to leave DRIVING.
 
-  - name: /planning/route_state
-    direction: output
-    required_in: [P0, P2, P3]
-    rate: {min_hz: 0.0}
-    note: >
-      UNSET -> SET -> ARRIVED. The ARRIVED transition is what the goal-reached metric reads, and
-      what concealer's lifecycle needs to leave DRIVING.
+    '
+- name: /planning/scenario_planning/lane_driving/behavior_planning/path_with_lane_id
+  type: autoware_internal_planning_msgs/msg/PathWithLaneId
+  from_manifest: false
+  direction: output
+  required_in: [P0, P2, P3]
+  rate: {min_hz: 8.0, max_hz: 30.0}
+  max_gap_s: 0.5
+  checks: [finite, nonempty]
+  note: 'path_generator''s output, and the first place a bad spawn pose shows up:
+    an ego that is not on a lanelet makes this silently empty, which is otherwise
+    indistinguishable from a broken integration. Not declared in core''s interface
+    manifest -- the strongest single candidate for an upstream interface-spec entry,
+    since it is a component boundary and it changed message package once already.
 
-  - name: /planning/scenario_planning/lane_driving/behavior_planning/path_with_lane_id
-    type: autoware_internal_planning_msgs/msg/PathWithLaneId
-    from_manifest: false
-    direction: output
-    required_in: [P0, P2, P3]
-    rate: {min_hz: 8.0, max_hz: 30.0}
-    max_gap_s: 0.5
-    checks: [finite, nonempty]
-    note: >
-      path_generator's output, and the first place a bad spawn pose shows up: an ego that is not
-      on a lanelet makes this silently empty, which is otherwise indistinguishable from a broken
-      integration. Not declared in core's interface manifest -- the strongest single candidate for
-      an upstream interface-spec entry, since it is a component boundary and it changed message
-      package once already.
+    '
+- name: /planning/scenario_planning/lane_driving/behavior_planning/path
+  type: autoware_planning_msgs/msg/Path
+  from_manifest: false
+  direction: output
+  required_in: [P0, P2, P3]
+  rate: {min_hz: 8.0, max_hz: 30.0}
+  max_gap_s: 0.5
+  checks: [finite, nonempty]
+  note: behavior_velocity_planner's output. Isolates StopLineModule from the stages
+    around it.
+- name: /planning/trajectory
+  direction: output
+  required_in: [P0, P2, P3]
+  rate: {min_hz: 8.0, max_hz: 60.0}
+  max_gap_s: 0.5
+  max_jitter_s: 0.06
+  latency_max_ms: 300
+  checks: [finite, nonempty, arc_length_monotonic, velocity_bounds]
+  note: 'The stack''s output and the controller''s only input. `finite` here is the
+    highest-value single check in this whole contract: a NaN in a trajectory propagates
+    through the controller without raising anything, and presents as a vehicle that
+    quietly stops or veers.
 
-  - name: /planning/scenario_planning/lane_driving/behavior_planning/path
-    type: autoware_planning_msgs/msg/Path
-    from_manifest: false
-    direction: output
-    required_in: [P0, P2, P3]
-    rate: {min_hz: 8.0, max_hz: 30.0}
-    max_gap_s: 0.5
-    checks: [finite, nonempty]
-    note: behavior_velocity_planner's output. Isolates StopLineModule from the stages around it.
-
-  - name: /planning/trajectory
-    direction: output
-    required_in: [P0, P2, P3]
-    rate: {min_hz: 8.0, max_hz: 60.0}
-    max_gap_s: 0.5
-    max_jitter_s: 0.06
-    latency_max_ms: 300
-    checks: [finite, nonempty, arc_length_monotonic, velocity_bounds]
-    note: >
-      The stack's output and the controller's only input. `finite` here is the highest-value
-      single check in this whole contract: a NaN in a trajectory propagates through the
-      controller without raising anything, and presents as a vehicle that quietly stops or veers.
-
-  - name: /planning/set_lanelet_route
-    kind: service
-    direction: input
-    required_in: [P0, P2, P3]
-
-  - name: /planning/set_waypoint_route
-    kind: service
-    direction: input
-    required_in: [P0, P2, P3]
-
+    '
+- name: /planning/set_lanelet_route
+  kind: service
+  direction: input
+  required_in: []
+- name: /planning/set_waypoint_route
+  kind: service
+  direction: input
+  required_in: []
 metrics:
-  - name: planning_trajectory_rate_hz
-    unit: Hz
-    interface: /planning/trajectory
-    statistic: rate_hz
-    gate: {min: 8.0}
-    required_in: [P0, P2, P3]
+- name: planning_trajectory_rate_hz
+  unit: Hz
+  interface: /planning/trajectory
+  statistic: rate_hz
+  gate: {min: 8.0}
+  required_in: [P0, P2, P3]
+- name: planning_trajectory_max_gap_s
+  unit: s
+  interface: /planning/trajectory
+  statistic: max_gap_s
+  gate: {max: 0.5}
+  required_in: [P0, P2, P3]
+  note: The stall detector. A 1.2 s freeze inside a 60 s run leaves the mean rate
+    healthy.
+- name: planning_trajectory_jitter_s
+  unit: s
+  interface: /planning/trajectory
+  statistic: jitter_s
+  gate: {max: 0.06}
+  required_in: [P0, P2, P3]
+- name: planning_path_with_lane_id_rate_hz
+  unit: Hz
+  interface: /planning/scenario_planning/lane_driving/behavior_planning/path_with_lane_id
+  statistic: rate_hz
+  gate: {min: 8.0}
+  required_in: [P0, P2, P3]
+- name: planning_behavior_path_rate_hz
+  unit: Hz
+  interface: /planning/scenario_planning/lane_driving/behavior_planning/path
+  statistic: rate_hz
+  gate: {min: 8.0}
+  required_in: [P0, P2, P3]
+- name: planning_check_failures
+  unit: count
+  interface: /planning/trajectory
+  statistic: check_failures
+  gate: {max: 0.0}
+  required_in: [P0, P2, P3]
+  note: 'Covers finite, nonempty, arc_length_monotonic and velocity_bounds. Any non-zero
+    value is a malformed trajectory, and none of them are survivable.
 
-  - name: planning_trajectory_max_gap_s
-    unit: s
-    interface: /planning/trajectory
-    statistic: max_gap_s
-    gate: {max: 0.5}
-    required_in: [P0, P2, P3]
-    note: The stall detector. A 1.2 s freeze inside a 60 s run leaves the mean rate healthy.
+    '
+- name: planning_time_to_first_trajectory_s
+  unit: s
+  derived: time_to_first_trajectory_s
+  gate: {max: 90.0}
+  required_in: [P0, P2, P3]
+  note: From evaluator start. Bounded loosely because it includes core's whole bring-up.
+- name: planning_time_from_route_to_trajectory_s
+  unit: s
+  derived: time_from_route_to_trajectory_s
+  gate: {max: 10.0}
+  required_in: [P0, P2, P3]
+  note: 'The tight one. Route set to first trajectory isolates planning''s own latency
+    from bring-up, and is the number that regresses when a planning module gets slower.
 
-  - name: planning_trajectory_jitter_s
-    unit: s
-    interface: /planning/trajectory
-    statistic: jitter_s
-    gate: {max: 0.06}
-    required_in: [P0, P2, P3]
+    '
+- name: planning_time_to_arrival_s
+  unit: s
+  derived: time_to_arrival_s
+  required_in: [P0, P2, P3]
+  note: Logged, not gated -- the bound is scenario-specific and belongs in the scenario.
+- name: planning_goal_reached
+  unit: bool
+  derived: goal_reached
+  required_in: [P0, P2, P3]
+  note: 'Gated in the scenario rather than here, via UserDefinedValueCondition on
+    /metrics/planning_goal_reached, because "did it arrive" is a scenario question.
 
-  - name: planning_path_with_lane_id_rate_hz
-    unit: Hz
-    interface: /planning/scenario_planning/lane_driving/behavior_planning/path_with_lane_id
-    statistic: rate_hz
-    gate: {min: 8.0}
-    required_in: [P0, P2, P3]
-
-  - name: planning_behavior_path_rate_hz
-    unit: Hz
-    interface: /planning/scenario_planning/lane_driving/behavior_planning/path
-    statistic: rate_hz
-    gate: {min: 8.0}
-    required_in: [P0, P2, P3]
-
-  - name: planning_check_failures
-    unit: count
-    interface: /planning/trajectory
-    statistic: check_failures
-    gate: {max: 0.0}
-    required_in: [P0, P2, P3]
-    note: >
-      Covers finite, nonempty, arc_length_monotonic and velocity_bounds. Any non-zero value is a
-      malformed trajectory, and none of them are survivable.
-
-  - name: planning_time_to_first_trajectory_s
-    unit: s
-    derived: time_to_first_trajectory_s
-    gate: {max: 90.0}
-    required_in: [P0, P2, P3]
-    note: From evaluator start. Bounded loosely because it includes core's whole bring-up.
-
-  - name: planning_time_from_route_to_trajectory_s
-    unit: s
-    derived: time_from_route_to_trajectory_s
-    gate: {max: 10.0}
-    required_in: [P0, P2, P3]
-    note: >
-      The tight one. Route set to first trajectory isolates planning's own latency from bring-up,
-      and is the number that regresses when a planning module gets slower.
-
-  - name: planning_time_to_arrival_s
-    unit: s
-    derived: time_to_arrival_s
-    required_in: [P0, P2, P3]
-    note: Logged, not gated -- the bound is scenario-specific and belongs in the scenario.
-
-  - name: planning_goal_reached
-    unit: bool
-    derived: goal_reached
-    required_in: [P0, P2, P3]
-    note: >
-      Gated in the scenario rather than here, via UserDefinedValueCondition on
-      /metrics/planning_goal_reached, because "did it arrive" is a scenario question.
+    '
