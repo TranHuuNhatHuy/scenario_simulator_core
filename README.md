@@ -120,37 +120,37 @@ Make sure to be at project root (previous step should bring you there).
 #### a. Minimal smoke test
 
 ```bash
-SCENARIO=core_smoke ./run_scenario.sh
+SCENARIO=core_smoke ./run_scenario.sh autoware.shim_standalone_mode:=false
 ```
 
 Or with RViz:
 
 ```bash
-LAUNCH_RVIZ=true SCENARIO=core_smoke ./run_scenario.sh
+LAUNCH_RVIZ=true SCENARIO=core_smoke ./run_scenario.sh autoware.shim_standalone_mode:=false
 ```
 
 #### b. Full component evaluation (9 components, 29 interfaces, 52 metrics)
 
 ```bash
-./run_scenario.sh
+./run_scenario.sh autoware.shim_standalone_mode:=false
 ```
 
 Or with RViz:
 
 ```bash
-LAUNCH_RVIZ=true ./run_scenario.sh 
+LAUNCH_RVIZ=true ./run_scenario.sh autoware.shim_standalone_mode:=false
 ```
 
 #### c. Run with `autoware_core`'s own localization in the loop (profile P2)
 
 ```bash
-PROFILE=P2 ./run_scenario.sh
+PROFILE=P2 ./run_scenario.sh autoware.shim_standalone_mode:=false
 ```
 
 Or with RViz:
 
 ```bash
-LAUNCH_RVIZ=true PROFILE=P2 ./run_scenario.sh 
+LAUNCH_RVIZ=true PROFILE=P2 ./run_scenario.sh autoware.shim_standalone_mode:=false
 ```
 
 ### Step 5. View component evaluation report
