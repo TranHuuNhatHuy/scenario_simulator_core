@@ -1,111 +1,106 @@
 component: control
 title: Control
-description: >
-  autoware_simple_pure_pursuit, on a 30 ms timer, plus autoware_command_gate where it is launched.
-  Control is where the loop actually closes, so besides liveness this component carries the two
-  metrics that say whether it closed correctly -- lateral deviation from the trajectory it was
-  given, and speed error against the speed it was asked for -- and the two comfort metrics taken
-  from the commands themselves rather than from a differentiated pose.
+description: 'autoware_simple_pure_pursuit, on a 30 ms timer, plus autoware_command_gate
+  where it is launched. Control is where the loop actually closes, so besides liveness
+  this component carries the two metrics that say whether it closed correctly -- lateral
+  deviation from the trajectory it was given, and speed error against the speed it
+  was asked for -- and the two comfort metrics taken from the commands themselves
+  rather than from a differentiated pose.
 
+  '
 interfaces:
-  - name: /control/command/control_cmd
-    direction: output
-    required_in: [P0, P2, P3]
-    rate: {min_hz: 20.0, max_hz: 120.0}
-    max_gap_s: 0.2
-    max_jitter_s: 0.03
-    checks: [finite, control_bounds]
-    note: >
-      simple_pure_pursuit's timer is 30 ms (33.3 Hz). The 20 Hz floor catches a halving; the
-      0.2 s gap catches a freeze, which at this point in the stack means the vehicle keeps its
-      last command.
+- name: /control/command/control_cmd
+  direction: output
+  required_in: [P0, P2, P3]
+  rate: {min_hz: 20.0, max_hz: 120.0}
+  max_gap_s: 0.2
+  max_jitter_s: 0.03
+  checks: [finite, control_bounds]
+  note: 'simple_pure_pursuit''s timer is 30 ms (33.3 Hz). The 20 Hz floor catches
+    a halving; the 0.2 s gap catches a freeze, which at this point in the stack means
+    the vehicle keeps its last command.
 
-  - name: /control/command/gear_cmd
-    direction: output
-    required_in: [P0, P2, P3]
-    rate: {min_hz: 0.0}
-    checks: [finite]
-
-  - name: /control/control_mode_request
-    kind: service
-    direction: input
-    required_in: [P0, P2, P3]
-
+    '
+- name: /control/command/gear_cmd
+  direction: output
+  required_in: [P0, P2, P3]
+  rate: {min_hz: 0.0}
+  checks: [finite]
+- name: /control/control_mode_request
+  kind: service
+  direction: input
+  required_in: []
 metrics:
-  - name: control_command_rate_hz
-    unit: Hz
-    interface: /control/command/control_cmd
-    statistic: rate_hz
-    gate: {min: 20.0}
-    required_in: [P0, P2, P3]
+- name: control_command_rate_hz
+  unit: Hz
+  interface: /control/command/control_cmd
+  statistic: rate_hz
+  gate: {min: 20.0}
+  required_in: [P0, P2, P3]
+- name: control_command_max_gap_s
+  unit: s
+  interface: /control/command/control_cmd
+  statistic: max_gap_s
+  gate: {max: 0.2}
+  required_in: [P0, P2, P3]
+- name: control_command_jitter_s
+  unit: s
+  interface: /control/command/control_cmd
+  statistic: jitter_s
+  gate: {max: 0.03}
+  required_in: [P0, P2, P3]
+  note: 'A timer-driven node''s jitter measures the executor, not the algorithm. It
+    is the earliest warning that the machine or the process is oversubscribed.
 
-  - name: control_command_max_gap_s
-    unit: s
-    interface: /control/command/control_cmd
-    statistic: max_gap_s
-    gate: {max: 0.2}
-    required_in: [P0, P2, P3]
+    '
+- name: control_check_failures
+  unit: count
+  interface: /control/command/control_cmd
+  statistic: check_failures
+  gate: {max: 0.0}
+  required_in: [P0, P2, P3]
+- name: control_max_lateral_deviation_m
+  unit: m
+  derived: max_lateral_deviation_m
+  gate: {max: 1.0}
+  required_in: [P0, P2, P3]
+  note: 'Worst perpendicular distance from the ego to the trajectory polyline while
+    moving, measured segment-wise rather than to the nearest vertex -- core''s trajectories
+    are sparse enough (~0.5 m) that nearest-vertex would overestimate systematically
+    and make the bound meaningless.
 
-  - name: control_command_jitter_s
-    unit: s
-    interface: /control/command/control_cmd
-    statistic: jitter_s
-    gate: {max: 0.03}
-    required_in: [P0, P2, P3]
-    note: >
-      A timer-driven node's jitter measures the executor, not the algorithm. It is the earliest
-      warning that the machine or the process is oversubscribed.
+    '
+- name: control_mean_speed_error_mps
+  unit: m/s
+  derived: mean_speed_error_mps
+  gate: {max: 2.0}
+  required_in: [P0, P2, P3]
+  note: Mean |actual - commanded| longitudinal speed while moving.
+- name: control_max_accel_mps2
+  unit: m/s^2
+  derived: max_accel_mps2
+  gate: {max: 5.0}
+  required_in: [P0, P2, P3]
+- name: control_max_jerk_mps3
+  unit: m/s^3
+  derived: max_jerk_mps3
+  gate: {max: 30.0}
+  required_in: [P0, P2, P3]
+  note: 'Taken from successive acceleration commands, so it measures what control
+    asked for rather than what the vehicle model produced. That is the number a comfort
+    regression moves first.
 
-  - name: control_check_failures
-    unit: count
-    interface: /control/command/control_cmd
-    statistic: check_failures
-    gate: {max: 0.0}
-    required_in: [P0, P2, P3]
+    '
+- name: control_max_speed_mps
+  unit: m/s
+  derived: max_speed_mps
+  required_in: [P0, P2, P3]
+  note: Logged, not gated here; scenarios gate it against their own maxSpeed.
+- name: control_traveled_distance_m
+  unit: m
+  derived: traveled_distance_m
+  required_in: [P0, P2, P3]
+  note: 'Logged. Its value is as a companion to goal_reached: distance travelled with
+    the goal not reached distinguishes "never moved" from "drove and stopped short".
 
-  - name: control_max_lateral_deviation_m
-    unit: m
-    derived: max_lateral_deviation_m
-    gate: {max: 1.0}
-    required_in: [P0, P2, P3]
-    note: >
-      Worst perpendicular distance from the ego to the trajectory polyline while moving, measured
-      segment-wise rather than to the nearest vertex -- core's trajectories are sparse enough
-      (~0.5 m) that nearest-vertex would overestimate systematically and make the bound
-      meaningless.
-
-  - name: control_mean_speed_error_mps
-    unit: m/s
-    derived: mean_speed_error_mps
-    gate: {max: 2.0}
-    required_in: [P0, P2, P3]
-    note: Mean |actual - commanded| longitudinal speed while moving.
-
-  - name: control_max_accel_mps2
-    unit: m/s^2
-    derived: max_accel_mps2
-    gate: {max: 5.0}
-    required_in: [P0, P2, P3]
-
-  - name: control_max_jerk_mps3
-    unit: m/s^3
-    derived: max_jerk_mps3
-    gate: {max: 30.0}
-    required_in: [P0, P2, P3]
-    note: >
-      Taken from successive acceleration commands, so it measures what control asked for rather
-      than what the vehicle model produced. That is the number a comfort regression moves first.
-
-  - name: control_max_speed_mps
-    unit: m/s
-    derived: max_speed_mps
-    required_in: [P0, P2, P3]
-    note: Logged, not gated here; scenarios gate it against their own maxSpeed.
-
-  - name: control_traveled_distance_m
-    unit: m
-    derived: traveled_distance_m
-    required_in: [P0, P2, P3]
-    note: >
-      Logged. Its value is as a companion to goal_reached: distance travelled with the goal not
-      reached distinguishes "never moved" from "drove and stopped short".
+    '
