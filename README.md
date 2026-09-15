@@ -33,7 +33,7 @@ Three pieces, and the separation between them is the point:
        ▼                                               ▼
   scenario_simulator_v2                          autoware_core
   fork branch `feat/awf-core`                    autowarefoundation/main
-  = tier4/master + 6 commits                     unmodified
+  = tier4/master + 3 commits                     unmodified
   (docs/FORK.md - each one a PR)
 ```
 
@@ -42,19 +42,18 @@ Three pieces, and the separation between them is the point:
 A vendored copy of `scenario_simulator_v2`
 would bury this project's ~6600 lines inside ~215 000 lines of someone else's, make every upstream
 release a merge exercise, and give a TIER IV reviewer no way to tell a contribution from a copy.
-The six changes this project genuinely needs to the simulator are carried where changes belong -
+The three changes this project genuinely needs to the simulator are carried where changes belong -
 as commits on a branch, with upstream's history underneath them:
 
 ```bash
-git log  --oneline upstream/master..HEAD   # 6 commits, all authored here
-git diff --stat     upstream/master..HEAD  # >50 files
+git log  --oneline upstream/master..HEAD   # 3 commits, all authored here
+git diff --stat     upstream/master..HEAD  # ~15 files
 git rebase          upstream/master        # how a new release is picked up
 ```
 
-Each of those six is a pull request as it stands. When they land upstream, the branch shrinks;
+Each of those three is a pull request as it stands. When they land upstream, the branch shrinks;
 when the last lands, `dependency.repos` points back at `tier4/scenario_simulator_v2` and the fork
-is deleted. [docs/FORK.md](docs/FORK.md) lists them, their independent value to upstream, and the
-two questions worth settling before filing.
+is deleted. [docs/FORK.md](docs/FORK.md) lists them and their independent value to upstream.
 
 A nightly CI job rebases that branch onto `tier4/master` and fails on conflict. It pushes nothing -
 it exists so drift is found while it still costs ten minutes.
@@ -265,25 +264,22 @@ Full specification: [docs/COMPONENT_EVALUATION.md](docs/COMPONENT_EVALUATION.md)
 
 ### 3.2 Autoware Foundation interfaces only
 
-`scenario_simulator_v2` cannot currently be built outside TIER IV without a TIER IV message
-repository. Commits 4–6 on the fork branch remove all six such dependencies:
+`scenario_simulator_v2` natively depends on `tier4_*` message repositories. Rather than aggressively stripping these out of the upstream project (which would require massive PRs and long reviews), we retain `tier4_*` as the public API of the simulator.
 
-| Removed | Replaced by |
+Instead, an **Adapter Node** (`autoware_core_message_bridge`) intercepts these `tier4_*` interfaces and seamlessly translates them to and from Autoware Foundation (`autoware_*`) equivalents on the fly:
+
+| Bridged TIER IV interface | Replaced by AWF equivalent |
 |---|---|
 | `tier4_planning_msgs/PathWithLaneId` | `autoware_internal_planning_msgs/PathWithLaneId` |
-| `tier4_simulation_msgs/*` | `autoware_scenario_simulation_msgs/*` (new; no AWF equivalent exists) |
-| `tier4_debug_msgs` | `autoware_internal_debug_msgs` |
 | `tier4_external_api_msgs/Engage` | AD API `/api/operation_mode/change_to_autonomous` |
 | `tier4_external_api_msgs/SetVelocityLimit` | `autoware_internal_planning_msgs/VelocityLimit`, latched |
 | `tier4_external_api_msgs/ResponseStatus` | `autoware_common_msgs` / `autoware_adapi_v1_msgs` `ResponseStatus` |
 | `tier4_external_api_msgs/Emergency` | `autoware_adapi_v1_msgs/MrmState` |
 | `tier4_rtc_msgs/*` | AD API cooperation (planning factors + `SetCooperation{Commands,Policies}`) |
 
-Three are genuine remodellings rather than renames; what changed in each, and what was lost, is in
-[docs/AWF_INTERFACE_MIGRATION.md](docs/AWF_INTERFACE_MIGRATION.md). Legacy `tier4_rtc_msgs` module
-names still work in scenarios, as aliases.
+This approach limits our required upstream simulator changes to just 3 minor architecture-recognition commits, keeping the simulator PR tiny, behavior-preserving, and much easier to approve. See [docs/AWF_INTERFACE_MIGRATION.md](docs/AWF_INTERFACE_MIGRATION.md).
 
-`awf/core/1.0.0` also becomes a first-class `architecture_type` and the default, replacing eight
+`awf/core/1.0.0` becomes a first-class `architecture_type` and the default, replacing eight
 scattered `find("awf/universe")` tests with one predicate - which is what removes the need to
 *lie* about the architecture in order to run against `autoware_core`.
 
