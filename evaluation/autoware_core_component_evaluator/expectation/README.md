@@ -57,6 +57,6 @@ metrics:
     gate: {max: 30.0}
 ```
 
-Every metric is published on `/metrics/<name>` as `autoware_scenario_simulation_msgs/UserDefinedValue`, so
+Every metric is published on `/metrics/<name>` as `tier4_simulation_msgs/UserDefinedValue`, so
 it can be used directly in a scenario's `UserDefinedValueCondition` with no interpreter change.
 Metric names must therefore match `[A-Za-z0-9_]+`.
