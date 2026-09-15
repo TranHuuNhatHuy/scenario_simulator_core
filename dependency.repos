@@ -26,8 +26,11 @@ repositories:
     version: main
 
   # ==== Autoware Foundation interfaces =====================================================
-  # There is deliberately no tier4_autoware_msgs entry. 
-  # This is to ensure this workspace fully belongs to AWF, no dependencies to TIER IV
+  # ==== TIER IV interfaces (required for scenario_simulator_v2) ==========================
+  tier4_autoware_msgs:
+    type: git
+    url: https://github.com/tier4/tier4_autoware_msgs.git
+    version: tier4/universe
   autoware_msgs:
     type: git
     url: https://github.com/autowarefoundation/autoware_msgs.git
@@ -60,3 +63,9 @@ repositories:
     type: git
     url: https://github.com/OUXT-Polaris/color_names.git
     version: master
+
+  # ==== test dependencies for scenario_simulator_v2 =========================================
+  replay_testing:
+    type: git
+    url: https://github.com/polymathrobotics/replay_testing.git
+    version: main

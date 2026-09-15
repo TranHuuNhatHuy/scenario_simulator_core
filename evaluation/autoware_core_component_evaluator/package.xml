@@ -8,7 +8,7 @@
     component interface specs core publishes itself, timing and validity measurement per
     interface, and accuracy metrics against scenario_simulator ground truth.
 
-    Every metric is published as autoware_scenario_simulation_msgs/UserDefinedValue on /metrics/&lt;name&gt;,
+    Every metric is published as tier4_simulation_msgs/UserDefinedValue on /metrics/&lt;name&gt;,
     which openscenario_interpreter's UserDefinedValueCondition binds directly -- so a metric
     threshold is a scenario pass/fail gate with no interpreter change, and metric failures land in
     the same JUnit XML as functional ones.
@@ -22,7 +22,7 @@
   <exec_depend>python3-yaml</exec_depend>
 
   <exec_depend>autoware_component_evaluation_msgs</exec_depend>
-  <exec_depend>autoware_scenario_simulation_msgs</exec_depend>
+  <exec_depend>tier4_simulation_msgs</exec_depend>
   <exec_depend>autoware_internal_metric_msgs</exec_depend>
 
   <!-- Message packages whose types are resolved at runtime. Declared so that rosdep installs

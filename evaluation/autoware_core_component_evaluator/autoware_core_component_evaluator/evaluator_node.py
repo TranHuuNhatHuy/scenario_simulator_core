@@ -30,7 +30,7 @@ WHAT THIS NODE DOES
      /simulation/evaluation/metrics       autoware_internal_metric_msgs/MetricArray, AWF-native,
                                           so anything in the Autoware ecosystem that already
                                           consumes metrics gets these for free
-     /metrics/<name>                      autoware_scenario_simulation_msgs/UserDefinedValue, one topic
+     /metrics/<name>                      tier4_simulation_msgs/UserDefinedValue, one topic
                                           per metric
 
    The third is what makes this usable as a *gate* rather than a report.
@@ -70,7 +70,7 @@ from autoware_component_evaluation_msgs.msg import (
     Verdict,
 )
 from autoware_internal_metric_msgs.msg import Metric, MetricArray
-from autoware_scenario_simulation_msgs.msg import UserDefinedValue, UserDefinedValueType
+from tier4_simulation_msgs.msg import UserDefinedValue, UserDefinedValueType
 
 from .checks import CHECKS
 from .contract import TOPIC, Contract
