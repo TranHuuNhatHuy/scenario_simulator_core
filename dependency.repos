@@ -1,32 +1,14 @@
-# Sources this overlay builds against. Import with vcstool into <workspace>/src:
-#
-#   mkdir -p ws/src && vcs import ws/src < dependency.repos
-#   ln -s "$PWD" ws/src/scenario_simulator_core
-#
-# NOTHING in this repository is a copy of either upstream. The simulator and Autoware are
-# fetched, not vendored, so `git log` here shows only work that belongs to this project and an
-# upstream release is picked up by bumping a version below.
-#
-# The scenario_simulator_v2 entry points at a fork branch, not at tier4/master, because six
-# commits are needed that have not landed upstream yet. That branch is `upstream/master` plus
-# those six commits and nothing else == see docs/FORK.md, which lists them and their status.
-# When a commit lands upstream it is dropped from the branch; when the last one lands, this
-# entry moves back to tier4/scenario_simulator_v2 and the fork disappears.
 repositories:
-  # ==== the simulator ======================================================================
   scenario_simulator_v2:
     type: git
-    url: https://github.com/TranHuuNhatHuy/scenario_simulator_v2.git
-    version: feat/awf-core
+    url: https://github.com/tier4/scenario_simulator_v2.git
+    version: master
 
-  # ==== the system under test ==============================================================
   autoware_core:
     type: git
     url: https://github.com/autowarefoundation/autoware_core.git
     version: main
 
-  # ==== Autoware Foundation interfaces =====================================================
-  # ==== TIER IV interfaces (required for scenario_simulator_v2) ==========================
   tier4_autoware_msgs:
     type: git
     url: https://github.com/tier4/tier4_autoware_msgs.git
@@ -44,7 +26,6 @@ repositories:
     url: https://github.com/autowarefoundation/autoware_internal_msgs.git
     version: main
 
-  # ==== build tooling that autoware_core requires ===========================================
   autoware_cmake:
     type: git
     url: https://github.com/autowarefoundation/autoware_cmake.git
@@ -58,13 +39,11 @@ repositories:
     url: https://github.com/autowarefoundation/autoware_lanelet2_extension.git
     version: main
 
-  # ==== required by scenario_simulator_v2 ===================================================
   color_names:
     type: git
     url: https://github.com/OUXT-Polaris/color_names.git
     version: master
 
-  # ==== test dependencies for scenario_simulator_v2 =========================================
   replay_testing:
     type: git
     url: https://github.com/polymathrobotics/replay_testing.git
