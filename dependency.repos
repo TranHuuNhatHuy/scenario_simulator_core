@@ -1,14 +1,18 @@
 repositories:
+  # ==== the simulator ======================================================================
   scenario_simulator_v2:
     type: git
     url: https://github.com/tier4/scenario_simulator_v2.git
     version: master
 
+  # ==== the system under test ==============================================================
   autoware_core:
     type: git
     url: https://github.com/autowarefoundation/autoware_core.git
     version: main
 
+  # ==== Autoware Foundation interfaces =====================================================
+  # ==== TIER IV interfaces (required for scenario_simulator_v2) ==========================
   tier4_autoware_msgs:
     type: git
     url: https://github.com/tier4/tier4_autoware_msgs.git
@@ -26,6 +30,7 @@ repositories:
     url: https://github.com/autowarefoundation/autoware_internal_msgs.git
     version: main
 
+  # ==== build tooling that autoware_core requires ===========================================
   autoware_cmake:
     type: git
     url: https://github.com/autowarefoundation/autoware_cmake.git
@@ -39,11 +44,13 @@ repositories:
     url: https://github.com/autowarefoundation/autoware_lanelet2_extension.git
     version: main
 
+  # ==== required by scenario_simulator_v2 ===================================================
   color_names:
     type: git
     url: https://github.com/OUXT-Polaris/color_names.git
     version: master
 
+  # ==== test dependencies for scenario_simulator_v2 =========================================
   replay_testing:
     type: git
     url: https://github.com/polymathrobotics/replay_testing.git
