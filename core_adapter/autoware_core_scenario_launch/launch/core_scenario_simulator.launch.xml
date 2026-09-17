@@ -191,22 +191,12 @@
     Older core: leave shim_standalone_mode:=true (the default) and this stays off.
   -->
   <group if="$(var launch_control)">
-    <include file="$(find-pkg-share autoware_core_control)/launch/autoware_core_control.launch.xml"/>
+    <include file="$(find-pkg-share autoware_core_control)/launch/autoware_core_control.launch.xml">
+      <arg name="launch_command_gate" value="true"/>
+    </include>
   </group>
 
-  <!--
-    The command gate is launched directly rather than via autoware_core_control's
-    launch_command_gate argument, because that argument only exists in autoware_core >= 1.8 and
-    passing an undeclared argument aborts the whole launch. Doing it here works on both.
-  -->
-  <group if="$(var launch_control)">
-    <group if="$(var use_command_gate)">
-      <push-ros-namespace namespace="control"/>
-      <node pkg="autoware_command_gate" exec="autoware_command_gate_exe"
-            name="autoware_command_gate" output="screen"/>
-    </group>
-  </group>
-
+  
   <!-- =========================================================================
        VEHICLE  (robot_state_publisher: base_link -> sensor frames)
        ========================================================================= -->
@@ -226,19 +216,7 @@
     </include>
   </group>
 
-  <!-- =========================================================================
-       AD API OPERATION MODE
-       The one control-plane gap left after the AWF interface migration: autoware_core has no
-       operation_mode node, so /api/operation_mode/state has no publisher and concealer's
-       lifecycle never leaves INITIALIZING. Everything else concealer needs is now served by
-       core's own default_adapi. Retired by an upstream OperationModeNode.
-       ========================================================================= -->
-  <node pkg="autoware_core_adapi_compat" exec="adapi_operation_mode" name="adapi_operation_mode"
-        output="screen">
-    <param name="standalone_mode"      value="$(var shim_standalone_mode)"/>
-    <param name="startup_stop_delay_s" value="$(var startup_stop_delay_s)"/>
-  </node>
-
+  
   <!-- =========================================================================
        COMPONENT EVALUATION
        Interface conformance + timing + validity per component, and the accuracy metrics that
