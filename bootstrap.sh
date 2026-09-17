@@ -35,4 +35,4 @@ vcs status "$WS/src" --nested 2>/dev/null | grep -E "^===|^[A-Z]" | head -30
 echo
 echo "next:"
 echo "  source setup_env.sh"
-echo "  cd $WS && colcon build --symlink-install --packages-up-to autoware_core scenario_simulator_v2 autoware_core_component_evaluator autoware_core_adapi_compat autoware_core_scenario_launch openscenario_experimental_catalog autoware_sample_vehicle_description autoware_sample_sensor_kit_description"
+echo "  cd $WS && colcon build --symlink-install --packages-up-to autoware_core scenario_simulator_v2 autoware_core_component_evaluator autoware_core_scenario_launch openscenario_experimental_catalog autoware_sample_vehicle_description autoware_sample_sensor_kit_description"
