@@ -33,7 +33,9 @@ OUTPUT_DIRECTORY="${OUTPUT_DIRECTORY:-/tmp/ssc_out}"
 # slowly than Universe's planning simulator, and the default budget is tight enough that a cold
 # machine fails here for no reason other than bring-up time.
 ros2 launch scenario_test_runner scenario_test_runner.launch.py \
-  architecture_type:=awf/core/1.0.0 \
+  architecture_type:=awf/universe/20250130 \
+  autoware_launch_package:=autoware_core_scenario_launch \
+  autoware_launch_file:=core_scenario_simulator.launch.xml \
   scenario:="$SSC_ROOT/scenarios/${SCENARIO}.yaml" \
   output_directory:="$OUTPUT_DIRECTORY" \
   initialize_duration:=120 \
