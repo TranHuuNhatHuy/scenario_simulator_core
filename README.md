@@ -1,16 +1,11 @@
 # scenario_simulator_core
 
-**Scenario-based testing and per-component evaluation for `autoware_core`, on Autoware Foundation
-interfaces only.**
+**Scenario-based testing and per-component evaluation for `autoware_core`, running on pure Autoware Foundation interfaces.**
 
-This repository is an **overlay**. It contains 4 ROS packages, 2 scenarios, 5 tools and its own
-documentation - and **no copy of any upstream repository**. `scenario_simulator_v2` and
-`autoware_core` are fetched at build time by `dependency.repos`, the same way both of those
-projects fetch their own dependencies.
+This repository is an **overlay**. It contains this project's custom tools, component evaluators, and launch configurations—without maintaining any vendored forks of upstream repositories. `scenario_simulator_v2` and `autoware_core` are fetched at build time by `dependency.repos`.
 
 ```
-66 files · 4 packages · ~6600 lines · 0 files copied from scenario_simulator_v2
-                                     · 3 files from autoware_core, each named in NOTICE
+66 files · 3 packages · ~6600 lines · 0 files copied from scenario_simulator_v2
 ```
 
 ---
@@ -21,163 +16,87 @@ Three pieces, and the separation between them is the point:
 
 ```
   ┌─ scenario_simulator_core ───────────────────────────────────────────┐
-  │  THIS repository. 100 % this project's work.                        │
+  │  THIS repository. 100% this project's work.                         │
   │                                                                     │
   │  evaluation/   the per-component contract + KPI engine              │
   │  msgs/         the evaluation data model                            │
-  │  core_adapter/ the autoware_core profile launcher + the AD API gap  │
+  │  core_adapter/ the autoware_core profile launcher                   │
   │  scenarios/ tools/ docs/                                            │
   └────────────────────────────┬────────────────────────────────────────┘
                                │ dependency.repos
        ┌───────────────────────┴───────────────────────┐
        ▼                                               ▼
   scenario_simulator_v2                          autoware_core
-  fork branch `feat/awf-core`                    autowarefoundation/main
-  = tier4/master + 3 commits                     unmodified
-  (docs/FORK.md - each one a PR)
+  tier4/master                                   autowarefoundation/main
+  unmodified, out-of-the-box                     with native AD API updates
 ```
 
-**Why not one repository with everything in it?** 
+**Zero Forks.** Earlier versions of this project maintained an external fork of `scenario_simulator_v2` to bridge AWF/TIER4 message types and inject an adapter node. However, this has been entirely replaced by a native approach:
+1. `autoware_core` itself has been natively updated to support the AD API Operation Modes.
+2. `scenario_simulator_v2` out-of-the-box (`awf/universe/20250130` architecture) natively supports `autoware_internal_planning_msgs`. 
 
-A vendored copy of `scenario_simulator_v2`
-would bury this project's ~6600 lines inside ~215 000 lines of someone else's, make every upstream
-release a merge exercise, and give a TIER IV reviewer no way to tell a contribution from a copy.
-The three changes this project genuinely needs to the simulator are carried where changes belong -
-as commits on a branch, with upstream's history underneath them:
-
-```bash
-git log  --oneline upstream/master..HEAD   # 3 commits, all authored here
-git diff --stat     upstream/master..HEAD  # ~15 files
-git rebase          upstream/master        # how a new release is picked up
-```
-
-Each of those three is a pull request as it stands. When they land upstream, the branch shrinks;
-when the last lands, `dependency.repos` points back at `tier4/scenario_simulator_v2` and the fork
-is deleted. [docs/FORK.md](docs/FORK.md) lists them and their independent value to upstream.
-
-A nightly CI job rebases that branch onto `tier4/master` and fails on conflict. It pushes nothing -
-it exists so drift is found while it still costs ten minutes.
+As a result, no forks, adapter nodes, or message shims are required.
 
 ---
 
-## 2. Quick start
+## 2. How to Build and Test
 
 ### Prerequisites
-
 Make sure you have standard ROS 2 (this project has been tested on 22.04 Humble) installed, and `vcstool` available:
-
 ```bash
 pip install --user vcstool
 ```
 
 ### Step 1. Clone
-
 ```bash
 git clone git@github.com:TranHuuNhatHuy/scenario_simulator_core.git
 cd scenario_simulator_core
 ```
 
-No need to manually clone the `scenario_simulator_v2` or `autoware_core`.
-
-### Step 2. Fetch codebase
-
+### Step 2. Fetch Codebase
+Run the bootstrap script to create the workspace (`ws/`) and clone `autoware_core`, `scenario_simulator_v2`, and other dependencies:
 ```bash
 ./bootstrap.sh
 ```
 
-This fetches `autoware_core` (original, unmodified) and `scenario_simulator_v2` (forked repo for now, on branch `feat/awf-core`)'s dependencies into a local `./ws` directory.
-
 ### Step 3. Build
-
-From project root:
-
+From the project root, source the environment and build the required packages:
 ```bash
-# Export necessary environment variables
 source setup_env.sh
-
-# Build
 cd ws
 colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release --packages-up-to \
     autoware_core \
     scenario_simulator_v2 \
     autoware_core_component_evaluator \
-    autoware_core_adapi_compat \
     autoware_core_scenario_launch \
     openscenario_experimental_catalog \
     autoware_sample_vehicle_description \
     autoware_sample_sensor_kit_description
-
 cd ..
 ```
 
-This should build 126 packages.
-
-### Step 4. Run scenarios
-
-Make sure to be at project root (previous step should bring you there).
-
-#### a. Minimal smoke test
+### Step 4. Run Scenarios
+You can easily test integration by running `run_scenario.sh`. This script handles the complex `scenario_test_runner` launch commands internally.
 
 ```bash
-SCENARIO=core_smoke ./run_scenario.sh autoware.shim_standalone_mode:=false
+# Run the complete scenario testing loop
+./run_scenario.sh
+
+# Run minimal smoke test (no gates)
+SCENARIO=core_smoke ./run_scenario.sh
+
+# Run with core's native localization instead of faked simulation
+PROFILE=P2 ./run_scenario.sh
+
+# Run with Rviz visualization enabled
+LAUNCH_RVIZ=true ./run_scenario.sh
 ```
 
-Or with RViz:
-
-```bash
-LAUNCH_RVIZ=true SCENARIO=core_smoke ./run_scenario.sh autoware.shim_standalone_mode:=false
-```
-
-#### b. Full component evaluation (9 components, 29 interfaces, 52 metrics)
-
-```bash
-./run_scenario.sh autoware.shim_standalone_mode:=false
-```
-
-Or with RViz:
-
-```bash
-LAUNCH_RVIZ=true ./run_scenario.sh autoware.shim_standalone_mode:=false
-```
-
-#### c. Run with `autoware_core`'s own localization in the loop (profile P2)
-
-```bash
-PROFILE=P2 ./run_scenario.sh autoware.shim_standalone_mode:=false
-```
-
-Or with RViz:
-
-```bash
-LAUNCH_RVIZ=true PROFILE=P2 ./run_scenario.sh autoware.shim_standalone_mode:=false
-```
-
-### Step 5. View component evaluation report
-
-Once a scenario run finishes, you can view exact metrics generated by evaluator:
-
-```bash
-ros2 run autoware_core_component_evaluator evaluation_report
-```
-
-JUnit XML supported:
-
-```bash
-ros2 run autoware_core_component_evaluator evaluation_report --junit /tmp/evaluation.xml
-```
-
-### Optional. Debug without the simulator
-
-If you want to verify that autoware_core is functioning correctly in isolation without spinning up the simulator, there are some hard-drive tools too:
-
-```bash
-python3 tools/handdrive.py         # Fake vehicle + localization
-python3 tools/verify_lifecycle.py  # Drive the AD API lifecycle by hand
-```
+Once completed, the component evaluator will parse the metrics and output a JUnit evaluation report in `/tmp/core_component_report.json` and print a summary to the console.
 
 ---
 
-## 3. What this project does
+## 3. What this repository contains
 
 ### 3.1 Per-component evaluation
 
@@ -262,65 +181,20 @@ a report a reviewer trusts and a wall of green.
 
 Full specification: [docs/COMPONENT_EVALUATION.md](docs/COMPONENT_EVALUATION.md).
 
-### 3.2 Autoware Foundation interfaces only
+### 3.2 Native Architecture Integration
+Instead of building "shims" on the outside, this project proves that `autoware_core` can interact with `scenario_simulator_v2` out of the box using pure AWF interfaces:
+- **Planning Messages:** `scenario_simulator_v2` natively supports `autoware_internal_planning_msgs/PathWithLaneId` via macro conditional checks.
+- **AD API Integration:** `autoware_core/api/autoware_default_adapi` is configured to natively handle modern `change_to_autonomous`, `enable_autoware_control`, and `change_operation_mode` service calls.
+- **Two-Axis Command Gate:** `autoware_core` implements a two-axis `autoware_command_gate` that completely separates mode logic from system control logic. 
 
-`scenario_simulator_v2` natively depends on `tier4_*` message repositories. Rather than aggressively stripping these out of the upstream project (which would require massive PRs and long reviews), we retain `tier4_*` as the public API of the simulator.
-
-Instead, an **Adapter Node** (`autoware_core_message_bridge`) intercepts these `tier4_*` interfaces and seamlessly translates them to and from Autoware Foundation (`autoware_*`) equivalents on the fly:
-
-| Bridged TIER IV interface | Replaced by AWF equivalent |
-|---|---|
-| `tier4_planning_msgs/PathWithLaneId` | `autoware_internal_planning_msgs/PathWithLaneId` |
-| `tier4_external_api_msgs/Engage` | AD API `/api/operation_mode/change_to_autonomous` |
-| `tier4_external_api_msgs/SetVelocityLimit` | `autoware_internal_planning_msgs/VelocityLimit`, latched |
-| `tier4_external_api_msgs/ResponseStatus` | `autoware_common_msgs` / `autoware_adapi_v1_msgs` `ResponseStatus` |
-| `tier4_external_api_msgs/Emergency` | `autoware_adapi_v1_msgs/MrmState` |
-| `tier4_rtc_msgs/*` | AD API cooperation (planning factors + `SetCooperation{Commands,Policies}`) |
-
-This approach limits our required upstream simulator changes to just 3 minor architecture-recognition commits, keeping the simulator PR tiny, behavior-preserving, and much easier to approve. See [docs/AWF_INTERFACE_MIGRATION.md](docs/AWF_INTERFACE_MIGRATION.md).
-
-`awf/core/1.0.0` becomes a first-class `architecture_type` and the default, replacing eight
-scattered `find("awf/universe")` tests with one predicate - which is what removes the need to
-*lie* about the architecture in order to run against `autoware_core`.
-
-### 3.3 The one remaining shim, and its retirement plan
-
-`core_adapter/autoware_core_adapi_compat` - the six `/api/operation_mode/*` AD API services
-`autoware_core` does not implement, plus the latched `OperationModeState` they publish.
-
-*Why it must exist.* `concealer` derives its whole lifecycle from three AD API topics.
-`autoware_default_adapi` implements interface, localization and routing only, so
-`/api/operation_mode/state` has **no publisher at all**, `LegacyAutowareState` is pinned at
-`INITIALIZING` forever, and every scenario times out with no other symptom. `change_to_stop` is
-called in `FieldOperatorApplication`'s constructor **unconditionally**, and `service.hpp` waits
-180 s then throws - so nothing works before any scenario logic runs.
-
-*Disposition.* Every endpoint graduates to an upstream `autoware_default_adapi` `OperationModeNode`.
-**Two bridges this package used to carry are already gone**, deleted because the interface
-migration removed the interfaces they bridged:
-
-| Was | Now |
-|---|---|
-| `/api/external/set/engage` | concealer engages via AD API `change_to_autonomous`, already served here |
-| `/api/autoware/set/velocity_limit` | concealer publishes `VelocityLimit` on the topic `velocity_smoother` already reads |
-
-That is the migration paying for itself. Report this package as a shrinking line count, not a
-feature.
+These native enhancements make simulator interaction completely transparent without any middleware node.
 
 ---
 
 ## 4. Provenance
 
 ### From `scenario_simulator_v2` - **nothing in this repository**
-
-Fetched via `dependency.repos`. The six required changes are commits on
-`TranHuuNhatHuy/scenario_simulator_v2:feat/awf-core`, each carrying TIER IV's copyright headers
-unmodified and stating what changed and why. See [docs/FORK.md](docs/FORK.md) and [NOTICE](NOTICE).
-
-Two scenarios are *derived* from upstream's `sample.yaml` and say so in their own headers.
-`scenarios/core_smoke.yaml` removes upstream's
-`currentMinimumRiskManeuverState == NORMAL` assertion: it needs `/api/fail_safe/mrm_state`, which
-core has no MRM to publish, so it could never be satisfied.
+Fetched via `dependency.repos`. This overlay runs strictly against upstream `tier4/scenario_simulator_v2` branch `master`.
 
 ### From `autoware_core` - 3 files, each named in [NOTICE](NOTICE)
 
@@ -330,28 +204,19 @@ core has no MRM to publish, so it could never be satisfied.
 | `core_adapter/.../config/pose_initializer_p0.param.yaml` | derived; covariances and thresholds verbatim, the five estimator flags resolved to `false` |
 | `core_adapter/.../launch/pose_initializer_only.launch.xml` | derived; all ten remappings verbatim, so the node binds the names core binds |
 
-Everything else core contributes is **referenced, not copied**: the profile launcher `include`s
-core's own launch files and reads its configs through `allow_substs`, so core's parameters always
-match core's binaries. Hand-writing them breaks the next time core adds a parameter.
-
-The contract thresholds were derived by **reading core's source**, and each is traceable:
-`path_generator`'s `planning_hz: 10.0` → the 8 Hz planning floors; `simple_pure_pursuit`'s 30 ms
-timer → the 20 Hz control floor; `behavior_velocity_planner` publishing
-`autoware_planning_msgs/Path` → the type on that contract entry.
+Everything else core contributes is **referenced, not copied**: the profile launcher `include`s core's own launch files and reads its configs through `allow_substs`, so core's parameters always match core's binaries. 
 
 ### Written for this project - everything else
 
 | Package | Lines | What it is |
 |---|---:|---|
 | `evaluation/autoware_core_component_evaluator` | 1723 py + 822 yaml | the contract engine, the 9 invariants, the derived metrics, the report tool |
-| `msgs/autoware_component_evaluation_msgs` | 77 | the evaluation data model - `Verdict` distinguishes `NOT_OBSERVED` from `NOT_APPLICABLE` from `FAIL`, and reuses `autoware_internal_metric_msgs/Metric` rather than defining a parallel type |
-| `core_adapter/autoware_core_adapi_compat` | 306 | the AD API operation-mode gap |
+| `msgs/autoware_component_evaluation_msgs` | 77 | the evaluation data model |
 | `core_adapter/autoware_core_scenario_launch` | 311 | the profile launcher |
-| `scenarios/`, `tools/`, `docs/`, CI, bootstrap | ~1400 | 2 scenarios, 5 tools, 3 design documents, 2 workflows |
+| `scenarios/`, `tools/`, `docs/`, CI, bootstrap | ~1400 | scenarios, tools, workflows |
 
 ---
 
 ## License
 
-Apache License 2.0. See [LICENSE](LICENSE) for the licence and [NOTICE](NOTICE) for attribution of the derived
-files and the fork branch.
+Apache License 2.0. See [LICENSE](LICENSE) for the licence and [NOTICE](NOTICE) for attribution of the derived files.
